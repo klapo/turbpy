@@ -1,23 +1,57 @@
 import numpy as np
+from .multiConst import *
+from .conversionTools import *
 
 def turbFluxes(
-        # input: model control
-        ixDerivMethod,                  # choice of method used to compute derivative (analytical or numerical)
-        ixStability,                    # method for calculating stability
-        ixStabParam,                    # Variable holding stability scheme parameters (unitless)
-        z0Ground,                       # Surface roughness length for log-layer (m)
-        # input: above-canopy forcing data
+        # input: atmosphere boundary conditions
         airTemp,                        # air temperature at some height above the surface (K)
         airPres,                        # air pressure of the air above the vegetation canopy (Pa)
         VPair,                          # vapor pressure of the air above the vegetation canopy (Pa)
         windspd,                        # wind speed above the canopy (m s-1)
-        # input: canopy and ground temperature
+        # input: surface boundary conditions
         groundTemp,                     # ground temperature (K)
         # input: diagnostic variables
         soilRelHumidity,                # relative humidity in the soil pores [0-1]
+        snowDepth,                      # depth of snow (m)
+        #
         mHeight,                        # height of observations (m)
-        snowDepth                       # depth of snow (m)
+        # input: model control
+        ixDerivMethod=None,             # choice of method used to compute derivative (analytical or numerical)
+        ixStability='mahrtExponential', # method for calculating stability
+        ixStabParam=None,               # Variable holding stability scheme parameters (unitless)
+        z0Ground=.005                   # Surface roughness length for log-layer (m)
         ):
+    '''
+    turbFluxes.py
+
+    Offline turbulent fluxes for non-canopy surfaces. Python companion code for
+    the SUMMA model. https://github.com/NCAR/summa
+
+    INPUT:
+        airTemp (K), airPres (Pa), VPair (Pa), windspd (m s-1), groundTemp (K),
+        soilRelHumidity [0-1], snowDepth (m)
+            - scalars of turbulence boundary conditions
+        mHeight (m)
+            - height of atmospheric observations. All observations assumed to come
+             from same height at the moment.
+        ixDerivMethod (analytical, numerical, or None)
+            - model control on how derivatives are computeDerivative
+        ixStability (see multiConst.py for options)
+            - stability scheme method (string)
+        ixStabParam (see multiConst.py for default values)
+            - Parameter values for the stability scheme.
+        z0Ground (m)
+            - surface roughness length
+
+    OUTPUT:
+        groundConductanceSH - ground conductance for sensible heat (m s-1)
+        groundConductanceLH - ground conductance for latent heat (m s-1)
+        senHeatGround - sensible heat flux from ground surface (W m-2)
+        latHeatGround - latent heat flux from ground surface (W m-2)
+        turbFluxGround - net turbulent heat fluxes at the ground surface (W m-2)
+        dTurbFluxGround_dTGround - derivative in net turbulent fluxes w.r.t. ground temperature (W m-2 K-1)
+    '''
+
 # --------------------------------------------------------------------------------------------------------------------
     if np.isnan(airTemp) or np.isnan(airPres) or np.isnan(VPair) or np.isnan(groundTemp):
         raise ValueError('Input data includes nan value.')
@@ -46,11 +80,6 @@ def turbFluxes(
         latHeatSubVapGround = LH_vap
     else:
         latHeatSubVapGround = LH_sub
-
-    ########
-    # Unpack stability parameter
-    if ~np.isnan(ixParam):
-        stabParams[ixStability] = ixParam
 
     ########
     # compute resistances
