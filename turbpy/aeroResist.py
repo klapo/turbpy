@@ -1,7 +1,6 @@
-import numpy as np
-
 def aeroResist( derivDesired,               # flag to indicate if analytical derivatives are desired
                 ixStability,                # choice of stability function
+                ixStabParam,                # Variable holding stability scheme parameters (unitless)
                 # input: forcing data
                 mHeight,                    # measurement height (m)
                 airTemp,                    # air temperature at some height above the surface (K)
@@ -11,9 +10,6 @@ def aeroResist( derivDesired,               # flag to indicate if analytical der
                 snowDepth,                  # snow depth (m)
                 # input: parameters
                 z0Ground,                   # surface roughness length (below canopy/non-vegetated [snow]) (m)
-                critRichNumber,             # critical value for the bulk Richardson number (-)
-                Louis79_bparam,             # parameter in Louis (1979) stability function
-                Mahrt87_eScale              # exponential scaling factor in the Mahrt (1987) stability function
                 ):
 # -------------------------------------------------------------------------------------------------------
 # compute aerodynamic resistances
@@ -51,17 +47,14 @@ def aeroResist( derivDesired,               # flag to indicate if analytical der
     # compute ground stability correction
     aStabilityOut = aStability(
                   # input
-                  derivDesired,                                 # logical flag to compute analytical derivatives
-                  ixStability,                                  # choice of stability function
+                  derivDesired,                             # logical flag to compute analytical derivatives
+                  ixStability,                              # choice of stability function
+                  ixStabParam,                              # Variable holding stability scheme parameters (unitless)
                   # input: forcing data, diagnostic and state variables
-                  heightAboveGround,                            # measurement height above the ground surface (m)
-                  airTemp,                                      # temperature above the ground surface (K)
-                  groundTemp,                                   # trial value of surface temperature (K)
-                  windspd,                                      # wind speed above the ground surface (m s-1)
-                  # input: stability parameters
-                  critRichNumber,                               # critical value for the bulk Richardson number (-)
-                  Louis79_bparam,                               # parameter in Louis (1979) stability function
-                  Mahrt87_eScale,                               # exponential scaling factor in Mahrt stability
+                  heightAboveGround,                        # measurement height above the ground surface (m)
+                  airTemp,                                  # temperature above the ground surface (K)
+                  groundTemp,                               # surface temperature (K)
+                  windspd,                                  # wind speed above the ground surface (m s-1)
                   )
 
     # Unpack
