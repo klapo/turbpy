@@ -1,3 +1,6 @@
+from multiConst import *
+from bulkRichardson import bulkRichardson
+
 def aStability(# input: control
             computeDerivative,              # logical flag to compute analytical derivatives
             ixStability,                    # choice of stability function
@@ -9,7 +12,7 @@ def aStability(# input: control
             windspd,                        # wind speed (m s-1)
             # input: stability parameters
             z0Ground,                   # surface roughness length (below canopy/non-vegetated [snow]) (m)
-):
+            ):
 
 ########
 # Sub-functions (stability schemes)
@@ -113,8 +116,8 @@ def aStability(# input: control
         # Get the function from switcher dictionary
         func = stabilityCase.get(ixStability, stabErrMess)
         # Gather stability function parameters
-        if ixStabParam:
-            stabParams[ixStability] = ixParam
+        # if ixStabParam:
+        #     stabParams[ixStability] = ixParam
         # Execute the function
         stabilityCorrection,dStabilityCorrection_dRich = func()
 
