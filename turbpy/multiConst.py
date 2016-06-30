@@ -1,3 +1,5 @@
+import numpy as np
+
 ########
 # Parameter Values
 ave_slp      =  101325.0     		 # mean sea level pressure              (Pa)
@@ -28,21 +30,30 @@ secprday     =   86400.      		 # number of seconds in a day
 secprhour    =    3600.      		 # number of seconds in an hour
 secprmin     =      60.      		 # number of seconds in a minute
 integerMissing = -9999          	 # value for mising integer
+machineEpsilon = (np.finfo(float).eps) # zero value for numerical stability
 
 ########
 # Parameter Values
-stabParams =
+
+# Stability parameters linked to parameter names
+# stabParams = \
+# {
+#     'critRichNumber' : .2,  # critical value for the bulk Richardson number (-)
+#     'Louis79_bparam' : 9.4, # parameter in Louis (1979) stability function
+#     'Mahrt87_eScale' : 1.    # exponential scaling factor in the Mahrt (1987) stability function
+# }
+
+stabParams = \
 {
-    'critRichNumber' : .2   # critical value for the bulk Richardson number (-)
-    'Louis79_bparam' : 9.4  # parameter in Louis (1979) stability function
-    'Mahrt87_eScale' : 1.   # exponential scaling factor in the Mahrt (1987) stability function
+    'standard' : .2,  # critical value for the bulk Richardson number (-)
+    'louisInversePower' : 9.4, # parameter in Louis (1979) stability function
+    'mahrtExponential' : 1.    # exponential scaling factor in the Mahrt (1987) stability function
 }
 
-########
 # stability Functions linked to needed stability parameters
-stabMethods =
+stabMethods = \
 {
-    'standard': critRichNumber,
-    'louisInversePower': Louis79_bparam,
-    'mahrtExponential': Mahrt87_eScale
-} 
+    'standard': 'critRichNumber',
+    'louisInversePower': 'Louis79_bparam',
+    'mahrtExponential': 'Mahrt87_eScale'
+}
