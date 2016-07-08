@@ -103,6 +103,37 @@ def aStability(# input: control
             dStabilityCorrection_dAirTemp = dRiBulk_dAirTemp * dStabilityCorrection_dRich
             dStabilityCorrection_dSfcTemp = dRiBulk_dSfcTemp * dStabilityCorrection_dRich
 
+        ########
+        # Possible alternative version of unstable case (from SNTHERM)
+		# Very unstable:
+		# Compute free convection limits.  Applies generally for L < -0.1
+		# Andreas and Cash, Convective heat transfer over wintertime
+		# leads and polynyas, JGR 104, C11, 25,721-25,734, 1999.
+		# Method is for a smooth surface with unlimited fetch.
+		# deltaB = (-9.8 .* deltaT ./ Tbar) .* dum;
+		# nu = 1.315.*10.^-5; 							% Kinematic viscosity of air
+		# D = 0.024 ./ (cdryair .* rhoair);
+		# Dv = 1.1494*D;
+		# zscale = (nu.*D./deltaB).^(1/3);
+		# zscalev = (nu*Dv/deltaB).^(1/3);
+		# freelim = -0.15 .*rhoair .* cdryair .* D .* deltaT ./zscale;
+		# freelimv = -0.15 .* Dv .* deltaE .* con .* 2.838.*10.^6./zscalev;
+        #
+        # def Unstable(L,Ht,zt,icall):
+        # 	# Set an upper limit on function at L = -.1 or  at 200 times
+        # 	# the large -Ht/L limit where log(-4*Ht/L) is 0.  This asymptotic
+        # 	# limit is from Godfrey and Beljaars (1991).  This is a semi-
+        # 	# empirical fix to keep the heat flux from increasing with
+        # 	# decreasing -L.
+        # 	Llim = min(-.1,-100.*zt);
+        # 	zeta = Ht / min(L,Llim);
+        # 	x = (1-16.*zeta).^0.25;
+        # 	if icall <= 1
+        # 		stab = log((1+x*x)/2)+2 .* log((1d0+x)/2) - 2.*atan(x) + 1.5707963;
+        # 	else
+        # 		stab = 2.*log((1+x*x)/2);
+        # 
+
     ########
     # process stable cases
     # Use a dictionary of functions to select stability function
