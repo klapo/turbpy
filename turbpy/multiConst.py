@@ -31,29 +31,24 @@ secprhour    =    3600.      		 # number of seconds in an hour
 secprmin     =      60.      		 # number of seconds in a minute
 integerMissing = -9999          	 # value for mising integer
 machineEpsilon = (np.finfo(float).eps) # zero value for numerical stability
+RiBulk_crit  =       1.47			 # Critical bulk Richardson              (unitless)
 
 ########
-# Parameter Values
+# Dictionaries for switch-case like behavior in python
 
 # Stability parameters linked to parameter names
-# stabParams = \
-# {
-#     'critRichNumber' : .2,  # critical value for the bulk Richardson number (-)
-#     'Louis79_bparam' : 9.4, # parameter in Louis (1979) stability function
-#     'Mahrt87_eScale' : 1.    # exponential scaling factor in the Mahrt (1987) stability function
-# }
-
 stabParams = \
 {
-    'standard' : .2,  # critical value for the bulk Richardson number (-)
-    'louisInversePower' : 9.4, # parameter in Louis (1979) stability function
-    'mahrtExponential' : 1.    # exponential scaling factor in the Mahrt (1987) stability function
+    'standard'          : .2,   # critical value for the bulk Richardson number (-)
+    'louisInversePower' : 9.4,  # parameter in Louis (1979) stability function
+    'mahrtExponential'  : 1.,   # exponential scaling factor in the Mahrt (1987) stability function
+    'moninObukhov'      : None  # No tunable parameters
 }
 
 # stability Functions linked to needed stability parameters
 stabMethods = \
 {
-    'standard': 'critRichNumber',
-    'louisInversePower': 'Louis79_bparam',
-    'mahrtExponential': 'Mahrt87_eScale'
+    'standard'          : 'critRichNumber',
+    'louisInversePower' : 'Louis79_bparam',
+    'mahrtExponential'  : 'Mahrt87_eScale'
 }

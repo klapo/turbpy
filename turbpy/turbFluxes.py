@@ -55,15 +55,17 @@ def turbFluxes(
 # --------------------------------------------------------------------------------------------------------------------
     if np.isnan(airTemp) or np.isnan(airPres) or np.isnan(VPair) or np.isnan(groundTemp):
         raise ValueError('Input data includes nan value.')
+    # check that measurement height above the ground surface is above the roughness length
+    if mHeight < snowDepth+z0Ground:
+        raise ValueErrorr('measurement height < snow depth + roughness length')
+    # define height above the snow surface
+    heightAboveGround  = mHeight - snowDepth
 
     ########
     # Local variables
     evapSmooth=1.                                  # smoothing parameter for latent heat (W m-2)
     volHeatCapacityAir = iden_air*Cp_air           # volumetric heat capacity of air (J m-3)
     latentHeatConstant = iden_air*w_ratio/airPres  # latent heat constant for (kg m-3 Pa-1)
-    # soilResistance is an unclear term for snow -- there is no resistance from snow: Sellers (1992)
-    # scalarSoilResistance = scalarGroundSnowFraction*1. + (1. - groundSnowFraction)*EXP(8.25 - 4.225*soilEvapFactor)
-    soilResistance = 1.
 
     ########
     # saturation vapor pressure at the temperature of the ground (Pa)
@@ -84,47 +86,38 @@ def turbFluxes(
     ########
     # compute resistances
     derivDesired = 'analytical' in ixDerivMethod or 'numerical' in ixDerivMethod
-    resistOut = aeroResist(
+    stabOut = aStability(
                     derivDesired,               # flag to indicate if analytical derivatives are desired
                     ixStability,                # choice of stability function
                     # input: above-canopy forcing data
-                    mHeight,                    # measurement height (m)
+                    heightAboveGround,           # measurement height (m)
                     airTemp,                    # air temperature at some height above the surface (K)
-                    windspd,                    # wind speed at some height above the surface (m s-1)
-                    # input: temperature (canopy, ground, canopy air space)
                     groundTemp,                 # ground temperature (K)
-                    # input: diagnostic variables
-                    snowDepth,                  # snow depth (m)
+                    windspd,                    # wind speed at some height above the surface (m s-1)
                     # input: parameters
                     z0Ground,                   # surface roughness length (below canopy/non-vegetated [snow]) (m)
-                    critRichNumber,             # critical value for the bulk Richardson number (-)
-                    Louis79_bparam,             # parameter in Louis (1979) stability function
-                    Mahrt87_eScale              # exponential scaling factor in the Mahrt (1987) stability function
                     )
 
-    # Unpack resistances
-    (RiBulkGround,                  # bulk Richardson number for the ground surface (-)
-    groundStabilityCorrection,      # stability correction for the ground surface (-)
-    groundResistance,               # below canopy aerodynamic resistance (s m-1)
-    dGroundResistance_dTGround      # derivative in ground resistance w.r.t. ground temperature (s m-1 K-1)
-    ) = resistOut
-
-    ########
-    # compute conductances, and derivatives...
-    # NOTE: soilResistance accounts for fractional snow, and =0 when snow cover is 100%
-    groundConductanceLH = 1./(groundResistance + soilResistance)
-    groundConductanceSH = 1./groundResistance
+    # Unpack conductances
+    (RiBulkGround,                              # bulk Richardson number (-)
+    groundStabilityCorrection,                  # stability correction for turbulent heat fluxes (-)
+    conductanceSensible,                        # Conductance parameter for sensible heat exchange
+    conductanceLatent,                          # Conductance parameter for latent heat exchange
+    _,                                          # derivative in stab. corr. w.r.t. Ri for the ground surface (-)
+    _,                                          # derivative in stab. corr. w.r.t. air temperature (K-1)
+    _                                           # derivative in stab. corr. w.r.t. sfc temperature (K-1)
+    ) = stabOut
 
     ########
     # compute sensible and latent heat fluxes, and derivatives...
     # (positive downwards)
-    senHeatGround      = -volHeatCapacityAir*groundConductanceSH*(groundTemp - airTemp)
-    latHeatGround      = -latHeatSubVapGround*latentHeatConstant*groundConductanceLH * \
+    senHeatGround      = -volHeatCapacityAir*conductanceSensible*(groundTemp - airTemp)
+    latHeatGround      = -latHeatSubVapGround*latentHeatConstant*conductanceLatent * \
                           (satVP_GroundTemp*soilRelHumidity - VPair)
 
 
     # compute derivatives
-    if ixDerivMethod == 'analytical':
+    if ixDerivMethod == 'analytical' and not ixStability == 'moninObukhov':
         # compute derivatives for the ground fluxes w.r.t. ground temperature
         # d(ground sensible heat flux)/d(ground temp)
         dSenHeatGround_dTGround =   (-volHeatCapacityAir*dGroundCondSH_dGroundTemp)*(groundTemp - airTemp) + \
