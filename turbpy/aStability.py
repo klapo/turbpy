@@ -253,7 +253,18 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                 # Decouple the atmosphere and land surface
                 conductanceSensible = mc.machineEpsilon
                 conductanceLatent = mc.machineEpsilon
-                return (psiM, psiH, conductanceSensible, conductanceLatent)
+                moninObukhovParameters = {'L': L,
+                                          'psiM': psiM,
+                                          'psiH': psiH,
+                                          'psiQ': psiQ,
+                                          'zeta': zeta,
+                                          'zetaT': zetaT,
+                                          'freelim': freelim,
+                                          'freelimv': freelimv,
+                                          }
+                moninObukhovDerivatives = np.nan
+                return (moninObukhovParameters, moninObukhovDerivatives,
+                        conductanceSensible, conductanceLatent)
 
             elif L < 0. and L > -1.0:
                 # Very unstable:
