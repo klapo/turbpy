@@ -155,8 +155,8 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         deltaT = airTemp - sfcTemp
         deltaE = airVaporPress - sfcVaporPress
         Tbar = (airTemp + sfcTemp) / 2.
-        zetaT = RiBulk * dlogW 		# Stability parameter
-        L = mHeight / zetaT 			# Obukhov height
+        zetaT = RiBulk * dlogW      # Stability parameter
+        L = mHeight / zetaT 		# Obukhov height
         if L < 0.:
             raise ValueError(
                 'Obukhov length less than zero (unstable) before iteration.'
@@ -191,19 +191,26 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
             #########
             # b. Estimate scalar roughness lengths (zh, zq,and zm) and
             # stability functions (heat and moisture)
+            #
+            # Assumes that measurement height for temperature and
+            # water vapor are made at the same height as wind. If this
+            # assumption is broken, psiQ and psiH need be calculated
+            # using the "Dutch" function.
             [z0Groundh, z0Groundq, dlogQ, dlogT] = \
                 andreas(ustar, z0Ground, airTemp, mHeight)
             if L >= 0.:
                 # Stable
                 psiH = psiM
                 psiQ = psiH
+                psimT = psiH
             else:
                 # Unstable
+                psimT = Unstable(L, mHeight, z0Groundh, 1)
                 psiH = Unstable(L, mHeight, z0Groundh, 2)
                 psiQ = psiH
             # Scalar lengths for temperature and moisture
             tstar = mc.vkc * deltaT / (dlogT - psiH)
-            qstar = (mc.vkc * deltaE * 100.
+            qstar = (mc.vkc * deltaE
                      / (mc.R_wv * airTemp * mc.iden_air)
                      / (dlogQ - psiQ))
 
@@ -216,7 +223,8 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                 # dum=L;
                 # L = L .* 9.8 .* 0.4 .* tstar./ (Tbar.* wstar.^2);
                 # L=1/L;
-                L = (1. / ((1. + 0.61 * Tbar * qstar / tstar)
+                B0 = (1. + 0.61 * Tbar * qstar / tstar)
+                L = (1. / (B0
                            * (mc.gravity * mc.vkc * tstar)
                            / (Tbar * ustar**2.)
                            )
@@ -224,6 +232,43 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
             elif (tstar == 0.) and (not ustar == 0.):
                 # Extremely stable, decouple the land surface
                 L = 1. * 10.**14.
+
+            #########
+            # d. Limits for extremely stable and unstable stratification
+            freelim = 0
+            freelimv = 0
+            if zetaT > 500 or mHeight / L > 500:
+                # Very stable
+                # Decouple the atmosphere and land surface
+                conductanceSensible = mc.machineEpsilon
+                conductanceLatent = mc.machineEpsilon
+                return (psiM, psiH, conductanceSensible, conductanceLatent)
+
+            elif L < 0. and L > -1.0:
+                # Very unstable:
+                # Compute free convection limits.  Applies generally for L < -0.1
+                # Andreas and Cash, Convective heat transfer over wintertime
+                # leads and polynyas, JGR 104, C11, 25,721-25,734, 1999.
+                # Method is for a smooth surface with unlimited fetch.
+
+                # Difference in bouyancy flux
+                deltaB = -(mc.gravity * deltaT / Tbar) * B0
+                # Kinematic viscosity of air
+                nu = 1.315 * 10**(-5.)
+                D = 0.024 / (mc.Cp_air * mc.iden_air)
+                Dv = 1.1494 * D
+
+                zscale = (nu * D / deltaB)**(1. / 3.)
+                zscalev = (nu * Dv / deltaB)**(1. / 3.)
+                freelim = -0.15 * mc.iden_air * mc.Cp_air * D * deltaT / zscale
+
+                # Commented code handles non-snow covered surfaces...
+                # if scalarGroundSnowFraction == 1:
+                freelimv = (-0.15 * Dv * deltaE * 2.838 * 10**(6.)
+                            / (zscalev * mc.R_wv * airTemp * mc.iden_air)
+                            )
+                # else:
+                #   freelimv=(dlogT/dlogQ)*freelimv
 
             ########
             # e. Compute change in zeta
@@ -236,14 +281,14 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                 zetaHigh = zetaT
 
             if (np.abs(y) < itTolerance) and (it >= 2):
-                # Within tolerance and more than one iteration executed, leave loop
+                # Within tolerance, leave loop
                 conductanceSensible = (mc.vkc**2.
                                        / ((dlogW - psiM) * (dlogT - psiH)))
                 conductanceLatent = (mc.vkc**2.
                                      / ((dlogW - psiM) * (dlogQ - psiQ)))
                 return (psiM, psiH, conductanceSensible, conductanceLatent)
-            if it == numMaxIterations - 1:
-                # NOT within tolerance after 50 iterations, leave loop
+            if it >= numMaxIterations - 1:
+                # NOT within tolerance, leave loop
                 conductanceSensible = (mc.vkc**2.
                                        / ((dlogW - psiM) * (dlogT - psiH)))
                 conductanceLatent = (mc.vkc**2.
@@ -257,25 +302,30 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
             # sequential estimates for unstable
             if L >= 0.:
                 # Next is derivative of Psi
-                DpsitDzetaT = -0.70 - 0.75 * \
-                    np.exp(-0.35 * zetaT) * (6. - 0.35 * zetaT)
-                DpsiMDzetaT = -0.70 - 0.75 * \
-                    np.exp(-0.35 * zeta) * (6. - 0.35 * zeta)
+                DpsitDzetaT = (-0.70 - 0.75
+                               * np.exp(-0.35 * zetaT)
+                               * (6. - 0.35 * zetaT)
+                               )
+                DpsiMDzetaT = (-0.70 - 0.75
+                               * np.exp(-0.35 * zeta)
+                               * (6. - 0.35 * zeta))
                 dumM = 1. / (dlogW - psiM)
                 dumT = 1. / (dlogT - psiH)
-                # Next is derivative of y (ignoring humidity effects)
+                # Derivative of y (ignoring humidity effects)
                 yprime = ((mHeight / L)
                           * ((DpsitDzetaT * dumT)
-                             - (2. * DpsiMDzetaT * dumM))
-                          - 1.)
+                             - (2. * DpsiMDzetaT * dumM)
+                             )
+                          - 1.
+                          )
                 zetaT = zetaT - (y / yprime)
                 if (zetaT <= zetaLow) or (zetaT >= zetaHigh):
                     # Root out of range. Bisection instead of Newton-Raphson
                     zetaT = (zetaHigh + zetaLow) / 2.
-            else:
-                zetaT = mHeight / L
-            # Update Obukhov length
-            L = mHeight / zetaT
+                else:
+                    zetaT = mHeight / L
+                # Update Obukhov length
+                L = mHeight / zetaT
 
 # ------------------------------------------------------------------------------
 # Sub-functions to Monin-Obukhov
