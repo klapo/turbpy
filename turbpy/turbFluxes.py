@@ -2,6 +2,7 @@ import numpy as np
 
 import multiConst as mc
 from aStability import aStability
+from surfFluxCalc import moninObukhov
 
 
 def turbFluxes(
@@ -97,19 +98,23 @@ def turbFluxes(
         )
 
     # Unpack conductances
-    (RiBulkGround,                  # bulk Richardson number (-)
-        groundStabilityCorrection,  # stability correction for turbulent heat fluxes (-)
-        conductanceSensible,        # Conductance parameter for sensible heat exchange
-        conductanceLatent,          # Conductance parameter for latent heat exchange
-        _, _, _) = stabOut
+    (RiBulkGround, stabilityCorrectionParameters,
+        stabilityCorrectionDerivatives, conductanceSensible,
+        conductanceLatent) = stabOut
 
     ########
-    # compute sensible and latent heat fluxes, and derivatives...
-    # (positive downwards)
+    # compute sensible and latent heat fluxes (positive downwards)
+    # Turbulent fluxes using bulk aerodynamic stability corrections.
     senHeatGround = -volHeatCapacityAir * conductanceSensible * \
         (sfcTemp - airTemp)
     latHeatGround = -latHeatSubVapGround * latentHeatConstant * \
         conductanceLatent * (sfcVaporPress - airVaporPress)
+    if 'moninObukhov' in ixStability:
+        # Turbulent fluxes for Monin-Obukhov similarity theory
+        senHeatGround, latHeatGround = moninObukhov(airTemp, airVaporPress,
+                                                    sfcTemp, sfcVaporPress, stabilityCorrectionParameters,
+                                                    senHeatGround, latHeatGround,
+                                                    conductanceSensible, conductanceLatent)
 
     # compute derivatives
     # if ixDerivMethod == 'analytical' and not ixStability == 'moninObukhov':
@@ -145,7 +150,8 @@ def turbFluxes(
         senHeatGround,  # sensible heat flux from ground surface (W m-2)
         latHeatGround,  # latent heat flux from ground surface (W m-2)
         turbFluxGround,  # net turbulent heat fluxes at the ground surface (W m-2)
-        groundStabilityCorrection,  # Stability correction (0-1)
+        stabilityCorrectionParameters,  # Stability correction (0-1)
+        stabilityCorrectionDerivatives,
         np.nan,  # derivative in net turbulent fluxes w.r.t. ground temperature (W m-2 K-1)
         )
 ###########################################################################################################

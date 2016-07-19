@@ -48,9 +48,14 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         conductanceSensible = conductance
         conductanceLatent = conductance
 
-        # Output
-        return (stabilityCorrection,
-                dStabilityCorrection_dRich,
+        # Collect output
+        bulkAerodynamicParameters = {'stabilityCorrection': stabilityCorrection,
+                                     }
+        bulkAerodynamicDerivatives = {
+            'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
+            }
+        return (bulkAerodynamicParameters,
+                bulkAerodynamicDerivatives,
                 conductanceSensible,
                 conductanceLatent,
                 )
@@ -74,14 +79,18 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 
         # Calculate conductance
         conductance = (conductanceNeutral * windspd * stabilityCorrection)
-
         # Assume that latent and sensible heat have same conductance
         conductanceSensible = conductance
         conductanceLatent = conductance
 
-        # Output
-        return (stabilityCorrection,
-                dStabilityCorrection_dRich,
+        # Collect output
+        bulkAerodynamicParameters = {'stabilityCorrection': stabilityCorrection,
+                                     }
+        bulkAerodynamicDerivatives = {
+            'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
+            }
+        return (bulkAerodynamicParameters,
+                bulkAerodynamicDerivatives,
                 conductanceSensible,
                 conductanceLatent,
                 )
@@ -95,7 +104,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         if stabilityCorrection < mc.machineEpsilon:
             stabilityCorrection = mc.machineEpsilon
 
-        # compute derivative in surface-atmosphere exchange coefficient w.r.t. temperature (K-1)
+        # compute derivative in stability correction w.r.t. temperature (K-1)
         if computeDerivative:
             dStabilityCorrection_dRich = (-Mahrt87_eScale
                                           * np.exp(-Mahrt87_eScale * RiBulk)
@@ -105,14 +114,18 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 
         # Calculate conductance
         conductance = (conductanceNeutral * windspd * stabilityCorrection)
-
         # Assume that latent and sensible heat have same conductance
         conductanceSensible = conductance
         conductanceLatent = conductance
 
-        # Output
-        return (stabilityCorrection,
-                dStabilityCorrection_dRich,
+        # Collect output
+        bulkAerodynamicParameters = {'stabilityCorrection': stabilityCorrection,
+                                     }
+        bulkAerodynamicDerivatives = {
+            'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
+            }
+        return (bulkAerodynamicParameters,
+                bulkAerodynamicDerivatives,
                 conductanceSensible,
                 conductanceLatent,
                 )
@@ -126,10 +139,10 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
             + 'Valid stability options: '
             + stabilityCase.keys
             )
+
 # ------------------------------------------------------------------------------
 # Monin-Obukhov stability as implemented in SNTHERM
 # ------------------------------------------------------------------------------
-
     def moninObukhov(z0Ground=z0Ground):
         # Assume that surface drag parameter is equal
         # between momentum, heat, and moisture
@@ -202,10 +215,8 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                 # Stable
                 psiH = psiM
                 psiQ = psiH
-                psimT = psiH
             else:
                 # Unstable
-                psimT = Unstable(L, mHeight, z0Groundh, 1)
                 psiH = Unstable(L, mHeight, z0Groundh, 2)
                 psiQ = psiH
             # Scalar lengths for temperature and moisture
@@ -286,7 +297,19 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                                        / ((dlogW - psiM) * (dlogT - psiH)))
                 conductanceLatent = (mc.vkc**2.
                                      / ((dlogW - psiM) * (dlogQ - psiQ)))
-                return (psiM, psiH, conductanceSensible, conductanceLatent)
+                # Collect MOST related parameters for use outside function
+                moninObukhovParameters = {'L': L,
+                                          'psiM': psiM,
+                                          'psiH': psiH,
+                                          'psiQ': psiQ,
+                                          'zeta': zeta,
+                                          'zetaT': zetaT,
+                                          'freelim': freelim,
+                                          'freelimv': freelimv,
+                                          }
+                moninObukhovDerivatives = np.nan
+                return (moninObukhovParameters, moninObukhovDerivatives,
+                        conductanceSensible, conductanceLatent)
             if it >= numMaxIterations - 1:
                 # NOT within tolerance, leave loop
                 conductanceSensible = (mc.vkc**2.
@@ -295,8 +318,19 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                                      / ((dlogW - psiM) * (dlogQ - psiQ)))
                 # Alert the user
                 print('Convergence problem in turbpy.aStability.moninObukhov')
-                return (psiM, psiH, conductanceSensible, conductanceLatent)
-
+                # Collect MOST related parameters for use outside function
+                moninObukhovParameters = {'L': L,
+                                          'psiM': psiM,
+                                          'psiH': psiH,
+                                          'psiQ': psiQ,
+                                          'zeta': zeta,
+                                          'zetaT': zetaT,
+                                          'freelim': freelim,
+                                          'freelimv': freelimv,
+                                          }
+                moninObukhovDerivatives = np.nan
+                return (moninObukhovParameters, moninObukhovDerivatives,
+                        conductanceSensible, conductanceLatent)
             #########
             # f. Use Newton-Raphson scheme for stable
             # sequential estimates for unstable
@@ -445,14 +479,13 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
     conductanceNeutral = (mc.vkc**2.) / (np.log((mHeight) / z0Ground)**2.)
     if RiBulk < 0.:
         #########
-        # process unstable cases
-        # compute surface-atmosphere exchange coefficient (-)
+        # Unstable
         stabilityCorrection = (1. - 16. * RiBulk)**(0.5)
-        # Calculate conductance
         conductance = (conductanceNeutral * windspd * stabilityCorrection)
-        # Assume latent and sensible heat have same conductance
+        # Assume latent and sensible heat have same conductance.
         conductanceSensible = conductance
         conductanceLatent = conductance
+
         # compute derivative in stability  w.r.t. temperature (K-1)
         if computeDerivative:
             dStabilityCorrection_dRich = ((-16.) * 0.5
@@ -464,36 +497,35 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 
     else:
         ########
-        # process stable cases
-        # Use a dictionary of functions to select stability function
+        # Stable cases
+        # Use a dictionary of functions to select stability function.
         func = stabilityCase.get(ixStability, stabErrMess)
-        (stabilityCorrection,
-         dStabilityCorrection_dRich,
+        (stabilityCorrectionParameters,
+         stabilityCorrectionDerivatives,
          conductanceSensible,
          conductanceLatent) = func()
 
     ########
     # Derivatives
     if computeDerivative:
-        # Derivative of stable cases
+        # Derivative of stability functions w.r.t. airTemp and sfcTemp
         dStabilityCorrection_dAirTemp = (dRiBulk_dAirTemp
                                          * dStabilityCorrection_dRich)
         dStabilityCorrection_dSfcTemp = (dRiBulk_dSfcTemp
                                          * dStabilityCorrection_dRich)
     else:
         # set derivative to nan if not computing
-        dStabilityCorrection_dRich = np.nan
         dStabilityCorrection_dAirTemp = np.nan
         dStabilityCorrection_dSfcTemp = np.nan
+    # Collect derivatives into dictionary
+    stabilityCorrectionDerivatives['dStabilityCorrection_dAirTemp'] = \
+        dStabilityCorrection_dAirTemp
+    stabilityCorrectionDerivatives['dStabilityCorrection_dSfcTemp'] = \
+        dStabilityCorrection_dSfcTemp
 
-    ########
-    # Output
-    # Need to add separate resistance and conductance here
-    # These arguments are passed to aeroResist from aStability
-    return (RiBulk,                                # bulk Richardson number (-)
-            stabilityCorrection,                    # stability correction for turbulent heat fluxes (-)
-            conductanceSensible,                    # Conductance parameter for sensible heat exchange
-            conductanceLatent,                      # Conductance parameter for latent heat exchange
-            dStabilityCorrection_dRich,             # derivative in stab. corr. w.r.t. Ri for the ground surface (-)
-            dStabilityCorrection_dAirTemp,          # derivative in stab. corr. w.r.t. air temperature (K-1)
-            dStabilityCorrection_dSfcTemp)          # derivative in stab. corr. w.r.t. sfc temperature (K-1)
+    return (RiBulk,
+            stabilityCorrectionParameters,
+            stabilityCorrectionDerivatives,
+            conductanceSensible,
+            conductanceLatent,
+            )
