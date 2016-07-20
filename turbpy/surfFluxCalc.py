@@ -1,4 +1,3 @@
-import numpy as np
 
 
 def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
@@ -31,7 +30,7 @@ def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
         dum = 0
         if not deltaT == 0:
             dum = -freelim / deltaT
-        senHeatGround = np.max(senHeatGround0, dum)
+        senHeatGround = max(senHeatGround0, dum)
 
         # Latent heat maximum for unstable
         dum = 0
