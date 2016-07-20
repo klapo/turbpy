@@ -166,7 +166,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         psiH = 0.					# Stability function for heat
         psiQ = 0.					# Stability function for water vapor
         deltaT = airTemp - sfcTemp
-        deltaE = airVaporPress - sfcVaporPress
+        deltaE = (airVaporPress - sfcVaporPress) / 100.  # Convert [Pa] -> [hPa]
         Tbar = (airTemp + sfcTemp) / 2.
         zetaT = RiBulk * dlogW      # Stability parameter
         L = mHeight / zetaT 		# Obukhov height
@@ -206,7 +206,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
             else:
                 # Unstable
                 psiM = Unstable(L, mHeight, z0Groundh, 1)
-            sqrtCd = mc.vkc / np.max((dlogW - psiM), 0.1)
+            sqrtCd = mc.vkc / max((dlogW - psiM), 0.1)
             ustar = sqrtCd * windspd
 
             #########
@@ -229,7 +229,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                 psiQ = psiH
             # Scalar lengths for temperature and moisture
             tstar = mc.vkc * deltaT / (dlogT - psiH)
-            qstar = (mc.vkc * deltaE
+            qstar = (mc.vkc * deltaE * 100
                      / (mc.R_wv * airTemp * mc.iden_air)
                      / (dlogQ - psiQ))
 

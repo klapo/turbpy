@@ -23,9 +23,9 @@ def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
     latHeatGround = Ck + latHeatGround0
     if L >= 0:
         senHeatGround = senHeatGround0
-        if senHeatGround0 < np.max(Csk, .1) and senHeatGround0 > 0:
+        if senHeatGround0 < max(Csk, .1) and senHeatGround0 > 0:
             # Enforce a minimum value.
-            senHeatGround = np.max(Csk, .1)
+            senHeatGround = max(Csk, .1)
     else:
         # Sensible heat maximum for unstable
         dum = 0
@@ -37,6 +37,9 @@ def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
         dum = 0
         if not deltaE == 0:
             dum = -freelimv / deltaE
-        latHeatGround = np.max(latHeatGround, dum)
+        latHeatGround = max(latHeatGround, dum)
 
+    # Convert to fluxes
+    senHeatGround = senHeatGround * deltaT
+    latHeatGround = latHeatGround * deltaE
     return (senHeatGround, latHeatGround)

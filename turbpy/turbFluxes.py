@@ -2,7 +2,7 @@ import numpy as np
 
 import multiConst as mc
 from aStability import aStability
-from surfFluxCalc import moninObukhov
+import surfFluxCalc
 
 
 def turbFluxes(
@@ -105,16 +105,23 @@ def turbFluxes(
     ########
     # compute sensible and latent heat fluxes (positive downwards)
     # Turbulent fluxes using bulk aerodynamic stability corrections.
-    senHeatGround = -volHeatCapacityAir * conductanceSensible * \
-        (sfcTemp - airTemp)
-    latHeatGround = -latHeatSubVapGround * latentHeatConstant * \
-        conductanceLatent * (sfcVaporPress - airVaporPress)
     if 'moninObukhov' in ixStability:
+        # MO uses a windless exchange coefficient for stable conditions
+        # Pass in the "wind function" to calculate fluxes.
+        senHeatGround = volHeatCapacityAir * conductanceSensible
+        latHeatGround = latHeatSubVapGround * latentHeatConstant * \
+            conductanceLatent
         # Turbulent fluxes for Monin-Obukhov similarity theory
-        senHeatGround, latHeatGround = moninObukhov(airTemp, airVaporPress,
-                                                    sfcTemp, sfcVaporPress, stabilityCorrectionParameters,
-                                                    senHeatGround, latHeatGround,
-                                                    conductanceSensible, conductanceLatent)
+        senHeatGround, latHeatGround = \
+            surfFluxCalc.moninObukhov(airTemp, airVaporPress,
+                                      sfcTemp, sfcVaporPress, stabilityCorrectionParameters,
+                                      senHeatGround, latHeatGround,
+                                      conductanceSensible, conductanceLatent)
+    else:
+        senHeatGround = -volHeatCapacityAir * conductanceSensible * \
+            (sfcTemp - airTemp)
+        latHeatGround = -latHeatSubVapGround * latentHeatConstant * \
+            conductanceLatent * (sfcVaporPress - airVaporPress)
 
     # compute derivatives
     # if ixDerivMethod == 'analytical' and not ixStability == 'moninObukhov':
