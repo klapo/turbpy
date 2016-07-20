@@ -336,7 +336,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                 conductanceLatent = (mc.vkc**2.
                                      / ((dlogW - psiM) * (dlogQ - psiQ)))
                 # Alert the user
-                print('Convergence problem in turbpy.aStability.moninObukhov')
+                # print('Convergence problem in turbpy.aStability.moninObukhov')
                 # Collect MOST related parameters for use outside function
                 moninObukhovParameters = {'L': L,
                                           'psiM': psiM,
