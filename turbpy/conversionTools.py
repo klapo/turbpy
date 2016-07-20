@@ -23,6 +23,11 @@ def satVapPress(TC):
     # SVP      : saturation vapor pressure (Pa)
     # dSVP_dT  : d(SVP)/dT
 
+    # Crude check for temperature in celsius
+    if np.size(TC) > 1 and min(TC) > 100.:
+        TC = TC - 273.
+    elif np.size(TC) == 1 and TC > 100.:
+        TC = TC - 273.
     X1 = 17.27
     X2 = 237.30
     # Saturation water vapour pressure at 273.16K (Pa)
