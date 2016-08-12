@@ -2,3 +2,11 @@
 ##################################
 # Specific files/directories to ignore
 /build/
+
+# Compiled python code
+*.pyc
+
+# Package generated files
+.ipynb_checkpoints/
+dist/
+turbpy.egg-info/
