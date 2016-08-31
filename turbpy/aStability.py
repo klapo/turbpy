@@ -1,7 +1,7 @@
 import numpy as np
 
-from bulkRichardson import bulkRichardson
-import multiConst as mc
+from turbpy.bulkRichardson import bulkRichardson
+import turbpy.multiConst as mc
 
 
 def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
@@ -389,8 +389,8 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         # limit is from Godfrey and Beljaars (1991).  This is a semi-
         # empirical fix to keep the heat flux from increasing with
         # decreasing -L.
-        Llim = np.min(-.1, -100. * zt)
-        zeta = mHeight / np.min(L, Llim)
+        Llim = min(-.1, -100. * zt)
+        zeta = mHeight / min(L, Llim)
         x = (1. - 16. * zeta)**(0.25)
         if icall == 1:
             stab = (np.log((1 + x**2.) / 2.)

@@ -1,4 +1,4 @@
-import multiConst as mc
+import turbpy.multiConst as mc
 
 
 def bulkRichardson(airTemp,                  # air temperature (K)

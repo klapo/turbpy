@@ -1,8 +1,8 @@
 import numpy as np
 
-import multiConst as mc
-from aStability import aStability
-import surfFluxCalc
+import turbpy.multiConst as mc
+from turbpy.aStability import aStability
+from turbpy.surfFluxCalc import surfFluxCalc
 
 
 def turbFluxes(
