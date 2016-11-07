@@ -2,7 +2,7 @@ import numpy as np
 
 import turbpy.multiConst as mc
 from turbpy.aStability import aStability
-from turbpy.surfFluxCalc import surfFluxCalc
+import turbpy.surfFluxCalc
 
 
 def turbFluxes(
