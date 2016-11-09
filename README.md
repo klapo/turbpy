@@ -2,7 +2,7 @@
 ## Offline land-surface turbulence schemes 
 Package designed to allow simulation of surface turbulent fluxes outside a land-model context.
 
-![Example of the stability functions available in the turbpy package.](https://github.com/klapo/turbpy/blob/master/TF.OfflineTurb.Idealized.pdf)
+![Example of the stability functions available in the turbpy package.](https://github.com/klapo/turbpy/blob/master/TF.OfflineTurb.Idealized.png)
 
 a) The stability corrections for the bulk aerodynamic methods
 
