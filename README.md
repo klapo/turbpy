@@ -2,7 +2,15 @@
 ## Offline land-surface turbulence schemes 
 Package designed to allow simulation of surface turbulent fluxes outside a land-model context.
 
-See the ipython notebook [TF.turbpyTest](./TF.turbpyTest.ipynb) for an example of how the turbpy package can be used.
+![Example of the stability functions available in the turbpy package.](./TF.OfflineTurb.Idealized.pdf)
+a) The stability corrections for the bulk aerodynamic methods
+
+b) the conductance for all methods
+
+c) the resulting sensible heat fluxes for each method assuming a surface temperature of 265K, wind speed of 1 m/s, 
+surface roughness of 0.005, and varying the air temperature from 253K (Ri = -1) to 293K (Ri = 2).
+
+See the ipython notebook [TF.turbpyTest](./TF.turbpyTest.ipynb) for an example of how the turbpy package can be used. The image above is generated in [TF.turbpyDemonstration](./TF.turbpyDemonstration.ipynb).
 
 ## References
 Many of these equations and definitions are derived from Chris Bretherton's notes on boundary layer meteorology, from Andreas 2001, and from SNTHERM revision 4.
