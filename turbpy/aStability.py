@@ -49,11 +49,13 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         conductanceLatent = conductance
 
         # Collect output
-        bulkAerodynamicParameters = {'stabilityCorrection': stabilityCorrection,
-                                     }
+        bulkAerodynamicParameters = {
+            'stabilityCorrection': stabilityCorrection,
+        }
         bulkAerodynamicDerivatives = {
             'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
-            }
+        }
+
         return (bulkAerodynamicParameters,
                 bulkAerodynamicDerivatives,
                 conductanceSensible,
@@ -84,11 +86,12 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         conductanceLatent = conductance
 
         # Collect output
-        bulkAerodynamicParameters = {'stabilityCorrection': stabilityCorrection,
-                                     }
+        bulkAerodynamicParameters = {
+            'stabilityCorrection': stabilityCorrection,
+        }
         bulkAerodynamicDerivatives = {
             'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
-            }
+        }
         return (bulkAerodynamicParameters,
                 bulkAerodynamicDerivatives,
                 conductanceSensible,
@@ -119,11 +122,12 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         conductanceLatent = conductance
 
         # Collect output
-        bulkAerodynamicParameters = {'stabilityCorrection': stabilityCorrection,
-                                     }
+        bulkAerodynamicParameters = {
+            'stabilityCorrection': stabilityCorrection,
+        }
         bulkAerodynamicDerivatives = {
             'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
-            }
+        }
         return (bulkAerodynamicParameters,
                 bulkAerodynamicDerivatives,
                 conductanceSensible,
@@ -138,7 +142,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
             + '\n'
             + 'Valid stability options: '
             + stabilityCase.keys
-            )
+        )
 
 # ------------------------------------------------------------------------------
 # Monin-Obukhov stability as implemented in SNTHERM
@@ -527,7 +531,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
             'dStabilityCorrection_dAirTemp': dStabilityCorrection_dAirTemp,
             'dStabilityCorrection_dSfcTemp': dStabilityCorrection_dSfcTemp,
             'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
-            }
+        }
     else:
         ########
         # Stable cases

@@ -15,11 +15,12 @@ def turbFluxes(
         snowDepth,                          # depth of snow (m)
         mHeight,                            # height of observations (m)
         groundSnowFraction=1,               # Fraction of ground covered by snow (-)
-        ixDerivMethod=False,                 # choice of method used to compute derivative (analytical or numerical)
+        ixDerivMethod=False,                # choice of method used to compute derivative (analytical or numerical)
         ixStability='mahrtExponential',     # method for calculating stability
         ixStabParam=mc.stabParams,          # Stability params from mc library
         z0Ground=.005                       # Surface roughness length for log-layer (m)
-        ):
+        windlessExchange=True,              # Enforce windless exchange minimum sensible heat flux
+):
     '''
     turbFluxes.py
 
@@ -95,7 +96,7 @@ def turbFluxes(
         sfcVaporPress,              # vapor pressure @ surface (Pa)
         windspd,                    # wind speed at @ mHeight (m s-1)
         z0Ground,                   # surface roughness length (m)
-        )
+    )
 
     # Unpack conductances
     (RiBulkGround, stabilityCorrectionParameters,
@@ -116,7 +117,8 @@ def turbFluxes(
             surfFluxCalc.moninObukhov(airTemp, airVaporPress,
                                       sfcTemp, sfcVaporPress, stabilityCorrectionParameters,
                                       senHeatGround, latHeatGround,
-                                      conductanceSensible, conductanceLatent)
+                                      conductanceSensible, conductanceLatent,
+                                      windlessExchange)
     else:
         senHeatGround = -volHeatCapacityAir * conductanceSensible * \
             (sfcTemp - airTemp)
@@ -160,5 +162,5 @@ def turbFluxes(
         stabilityCorrectionParameters,  # Stability correction (0-1)
         stabilityCorrectionDerivatives,
         np.nan,  # derivative in net turbulent fluxes w.r.t. ground temperature (W m-2 K-1)
-        )
+    )
 ###########################################################################################################
