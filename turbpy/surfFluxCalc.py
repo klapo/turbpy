@@ -1,9 +1,11 @@
+import turbpy.multiConst as mc
 
 
 def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
                  stabilityCorrectionParameters, senHeatGround0, latHeatGround0,
                  conductanceSensible, conductanceLatent,
-                 windlessExchange=True):
+                 volHeatCapacityAir, latHeatSubVapGround,
+                 latentHeatConstant, windlessExchange=True):
 
     # Windless exchange coefficients for water vapor, k, and heat, sk [Wm^-2]
     Ck = 0
@@ -18,7 +20,8 @@ def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
     deltaT = airTemp - sfcTemp
     deltaE = airVaporPress - sfcVaporPress
 
-    # Calculate sensible and latent heat fluxes.
+    ########
+    # Windless Exchange -- Calculate sensible and latent heat fluxes.
     if windlessExchange:
         # Note that the fluxes include the windless exchange coefficients.
         latHeatGround = Ck + latHeatGround0
@@ -40,12 +43,8 @@ def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
                 dum = -freelimv / deltaE
             latHeatGround = max(latHeatGround, dum)
 
-        # Convert to fluxes
-        senHeatGround = senHeatGround * deltaT
-        latHeatGround = latHeatGround * deltaE
-        return (senHeatGround, latHeatGround)
-
-    # Do not include windless exchange.
+    ########
+    # NO Windless Exchange -- Calculate sensible and latent heat fluxes.
     elif not windlessExchange:
         # Note that the fluxes include the windless exchange coefficients.
         latHeatGround = Ck + latHeatGround0
@@ -64,7 +63,17 @@ def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
                 dum = -freelimv / deltaE
             latHeatGround = max(latHeatGround, dum)
 
-        # Convert to fluxes
-        senHeatGround = senHeatGround * deltaT
-        latHeatGround = latHeatGround * deltaE
-        return (senHeatGround, latHeatGround)
+    ########
+    # Back out new conductance
+    conductanceSensible = senHeatGround / volHeatCapacityAir
+    conductanceLatent = latHeatGround / (latentHeatConstant * conductanceLatent)
+
+    ########
+    # Convert to fluxes
+    senHeatGround = senHeatGround * deltaT
+    latHeatGround = latHeatGround * deltaE
+
+    ########
+    # Return turbulent fluxes and newly calculated conductances
+    return (senHeatGround, latHeatGround,
+            conductanceSensible, conductanceLatent)

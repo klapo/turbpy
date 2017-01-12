@@ -12,7 +12,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
     ixStabParam             Variable holding stability scheme parameters (unitless)
     mHeight                 measurement height above the surface (m)
     airTemp                 air temperature (K)
-    airVaporPress                   vapor pressure of air (Pa)
+    airVaporPress           vapor pressure of air (Pa)
     sfcTemp                 surface temperature (K)
     VPground                Vapor pressure at the surface (Pa)
     windspd                 wind speed (m s-1)
@@ -28,7 +28,8 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
     def standard(critRichNumber=mc.stabParams['standard']):
         # compute surface-atmosphere exchange coefficient (-)
         if RiBulk < critRichNumber:
-            stabilityCorrection = (1. - 5. * RiBulk)**2.
+            inverseCritRichNum = 1 / critRichNumber
+            stabilityCorrection = (1. - inverseCritRichNum * RiBulk)**2.
         else:
             stabilityCorrection = mc.machineEpsilon
 
@@ -141,7 +142,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
             + ixStability
             + '\n'
             + 'Valid stability options: '
-            + stabilityCase.keys
+            + stabilityCase.keys()
         )
 
 # ------------------------------------------------------------------------------
@@ -195,6 +196,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                                               'zetaT': zetaT,
                                               'freelim': 0.,
                                               'freelimv': 0.,
+                                              'stabilityCorrection': np.nan,
                                               }
                     moninObukhovDerivatives = {}
                     return (moninObukhovParameters, moninObukhovDerivatives,
@@ -273,6 +275,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                                           'zetaT': zetaT,
                                           'freelim': freelim,
                                           'freelimv': freelimv,
+                                          'stabilityCorrection': np.nan,
                                           }
                 moninObukhovDerivatives = {}
                 return (moninObukhovParameters, moninObukhovDerivatives,
@@ -329,6 +332,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                                           'zetaT': zetaT,
                                           'freelim': freelim,
                                           'freelimv': freelimv,
+                                          'stabilityCorrection': np.nan,
                                           }
                 moninObukhovDerivatives = {}
                 return (moninObukhovParameters, moninObukhovDerivatives,
@@ -350,6 +354,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                                           'zetaT': zetaT,
                                           'freelim': freelim,
                                           'freelimv': freelimv,
+                                          'stabilityCorrection': np.nan,
                                           }
                 moninObukhovDerivatives = {}
                 return (moninObukhovParameters, moninObukhovDerivatives,

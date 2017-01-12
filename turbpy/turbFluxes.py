@@ -18,7 +18,7 @@ def turbFluxes(
         ixDerivMethod=False,                # choice of method used to compute derivative (analytical or numerical)
         ixStability='mahrtExponential',     # method for calculating stability
         ixStabParam=mc.stabParams,          # Stability params from mc library
-        z0Ground=.005                       # Surface roughness length for log-layer (m)
+        z0Ground=.005,                      # Surface roughness length for log-layer (m)
         windlessExchange=True,              # Enforce windless exchange minimum sensible heat flux
 ):
     '''
@@ -113,12 +113,13 @@ def turbFluxes(
         latHeatGround = latHeatSubVapGround * latentHeatConstant * \
             conductanceLatent
         # Turbulent fluxes for Monin-Obukhov similarity theory
-        senHeatGround, latHeatGround = \
+        senHeatGround, latHeatGround, conductanceSensible, conductanceLatent = \
             surfFluxCalc.moninObukhov(airTemp, airVaporPress,
                                       sfcTemp, sfcVaporPress, stabilityCorrectionParameters,
                                       senHeatGround, latHeatGround,
                                       conductanceSensible, conductanceLatent,
-                                      windlessExchange)
+                                      volHeatCapacityAir, latHeatSubVapGround,
+                                      latentHeatConstant, windlessExchange)
     else:
         senHeatGround = -volHeatCapacityAir * conductanceSensible * \
             (sfcTemp - airTemp)
