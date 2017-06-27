@@ -25,7 +25,10 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 # ------------------------------------------------------------------------------
 # "standard" stability correction, a la Anderson 1976
 # ------------------------------------------------------------------------------
-    def standard(critRichNumber=mc.stabParams['standard']):
+    def standard(stabParams=mc.stabParams):
+        # Assign parameter value
+        critRichNumber = stabParams['standard']
+
         # compute surface-atmosphere exchange coefficient (-)
         if RiBulk < critRichNumber:
             inverseCritRichNum = 1 / critRichNumber
@@ -66,7 +69,10 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 # ------------------------------------------------------------------------------
 # Louis 1979
 # ------------------------------------------------------------------------------
-    def louisInversePower(Louis79_bparam=mc.stabParams['louisInversePower']):
+    def louisInversePower(stabParams=mc.stabParams):
+        # Grab paramter values
+        Louis79_bparam = stabParams['louisInversePower']
+
         # compute surface-atmosphere exchange coefficient (-)
         bprime = Louis79_bparam / 2.
         stabilityCorrection = 1. / ((1. + bprime * RiBulk)**2.)
@@ -102,7 +108,10 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 # ------------------------------------------------------------------------------
 # Mahrt 1987
 # ------------------------------------------------------------------------------
-    def mahrtExponential(Mahrt87_eScale=mc.stabParams['mahrtExponential']):
+    def mahrtExponential(stabParams=mc.stabParams):
+        # Grab stab params
+        Mahrt87_eScale = stabParams['mahrtExponential']
+
         # compute surface-atmosphere exchange coefficient (-)
         stabilityCorrection = np.exp(-Mahrt87_eScale * RiBulk)
         if stabilityCorrection < mc.machineEpsilon:
@@ -148,9 +157,10 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 # ------------------------------------------------------------------------------
 # Monin-Obukhov stability as implemented in SNTHERM
 # ------------------------------------------------------------------------------
-    def moninObukhov(z0Ground=z0Ground):
-        # Assume that surface drag parameter is equal
-        # between momentum, heat, and moisture
+    def moninObukhov(stabParams=mc.stabParams, z0Ground=z0Ground):
+        # Grab paramter values (none used in MO method as implmented currently)
+
+        # Assume surface drag is equal between momentum, heat, and moisture
         z0Groundw = z0Ground
         z0Groundh = z0Ground
         z0Groundq = z0Ground
@@ -545,7 +555,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         (stabilityCorrectionParameters,
          stabilityCorrectionDerivatives,
          conductanceSensible,
-         conductanceLatent) = func()
+         conductanceLatent) = func(stabParams=ixStabParam)
 
         ########
         # Derivatives
