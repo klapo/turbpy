@@ -35,12 +35,12 @@ stabParams = {
     'standard': .2,             # critical value for the bulk Richardson number (-)
     'louisInversePower': 9.4,   # parameter in Louis (1979) stability function
     'mahrtExponential': 1.,     # exponential scaling factor in the Mahrt (1987) stability function
-    'moninObukhov': np.nan,        # No tunable parameters
-    }
+    'moninObukhov': 2.,         # Windless exchange for Csk in surfFluxCalc
+}
 
 # stability Functions linked to needed stability parameters
 stabMethods = {
     'standard': 'critRichNumber',
     'louisInversePower': 'Louis79_bparam',
     'mahrtExponential': 'Mahrt87_eScale',
-    }
+}
