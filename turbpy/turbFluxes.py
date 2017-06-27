@@ -16,7 +16,7 @@ def turbFluxes(
         mHeight,                            # height of observations (m)
         groundSnowFraction=1,               # Fraction of ground covered by snow (-)
         ixDerivMethod=False,                # choice of method used to compute derivative (analytical or numerical)
-        ixStability='mahrtExponential',     # method for calculating stability
+        ixStability='standard',             # method for calculating stability
         ixStabParam=mc.stabParams,          # Stability params from mc library
         z0Ground=.005,                      # Surface roughness length for log-layer (m)
         windlessExchange=True,              # Enforce windless exchange minimum sensible heat flux
