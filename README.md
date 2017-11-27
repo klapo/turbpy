@@ -32,4 +32,5 @@ Mahrt, L. (1987). Grid-Averaged Surface Fluxes. Monthly Weather Review. https://
 We implement the numerical approximation from SNTHERM revision 4, as described in Andreas 2001 and Jordan and Andreas 2004.
 
 Andreas, E. L. (2001), Parameterizing Scalar Transfer over Snow and Ice: A Review, J. Hydrometeorol., 3, 417–432.  
+Andreas, E. L., Jordan, R. E., & Makshtas, A. P. (2004). Simulations of Snow, Ice, and Near-Surface Atmospheric Processes on Ice Station Weddell. Journal of Hydrometeorology, 5(4), 611–624. https://doi.org/10.1175/1525-7541(2004)005<0611:SOSIAN>2.0.CO;2  
 Chris Bretheron's [notes on boundary layer meteorology](atmos.washington.edu/~breth/classes/AS547)
