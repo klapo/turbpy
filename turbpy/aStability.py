@@ -18,12 +18,26 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
     windspd                 wind speed (m s-1)
     z0Ground                surface roughness length (below canopy/non-vegetated [snow]) (m)
     '''
+
+# ------------------------------------------------------------------------------
+# Error handling for a non-recognized stability method
+# ------------------------------------------------------------------------------
+    ' Stability Error Message '
+    def stabErrMess():
+        raise ValueError(
+            'Unrecognized stability choice: '
+            + ixStability
+            + '\n'
+            + 'Valid stability options: '
+            + stabilityCase.keys()
+        )
+
 # ------------------------------------------------------------------------------
 # Sub-functions (stability schemes)
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
-# "standard" stability correction, a la Anderson 1976
+# "standard" stability correction (Anderson/Webb/log-linear)
 # ------------------------------------------------------------------------------
     def standard(stabParams=mc.stabParams):
         # Assign parameter value
@@ -143,16 +157,6 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                 conductanceSensible,
                 conductanceLatent,
                 )
-
-    ' Stability Error Message '
-    def stabErrMess():
-        raise ValueError(
-            'Unrecognized stability choice: '
-            + ixStability
-            + '\n'
-            + 'Valid stability options: '
-            + stabilityCase.keys()
-        )
 
 # ------------------------------------------------------------------------------
 # Monin-Obukhov stability as implemented in SNTHERM
