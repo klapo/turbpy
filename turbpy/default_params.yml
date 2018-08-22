@@ -1,0 +1,21 @@
+# Default parameter values and parameterizations
+
+# ------------------------------------------------------------------------------
+stabParams:
+    # Where the data is located
+    standard: 0.2
+    # critical value for the bulk Richardson number (-)
+    louisInversePower: 9.4
+    # exponential scaling factor in the Mahrt (1987) stability function
+    mahrtExponential: 1.
+    # Windless exchange for Csk in surfFluxCalc
+    moninObukhov: 2.
+# ------------------------------------------------------------------------------
+# This field is no longer implemented. Kept as a legacy reminder for older
+# package implementations.
+stabMethods:
+    standard: 'critRichNumber'
+    louisInversePower: 'Louis79_bparam'
+    mahrtExponential: 'Mahrt87_eScale'
+
+# ------------------------------------------------------------------------------
