@@ -9,14 +9,16 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
     '''
     computeDerivative:      logical flag to compute analytical derivatives
     ixStability             choice of stability function
-    ixStabParam             Variable holding stability scheme parameters (unitless)
+    ixStabParam             Variable holding stability scheme parameters
+                            (multi-level dictionary with upper level key the
+                            same as ixStability)
     mHeight                 measurement height above the surface (m)
     airTemp                 air temperature (K)
     airVaporPress           vapor pressure of air (Pa)
     sfcTemp                 surface temperature (K)
     VPground                Vapor pressure at the surface (Pa)
     windspd                 wind speed (m s-1)
-    z0Ground                surface roughness length (below canopy/non-vegetated [snow]) (m)
+    z0Ground                surface roughness length (non-vegetated/snow) (m)
     '''
 
 # ------------------------------------------------------------------------------
@@ -50,15 +52,6 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         else:
             stabilityCorrection = mc.machineEpsilon
 
-        # compute derivative in surface-atmosphere exchange coefficient w.r.t. temperature (K-1)
-        if computeDerivative:
-            if RiBulk < critRichNumber:
-                dStabilityCorrection_dRich = -5. * 2. * (1. - 5. * RiBulk)
-            if RiBulk >= critRichNumber:
-                dStabilityCorrection_dRich = 0.
-        else:
-            dStabilityCorrection_dRich = np.nan
-
         # Calculate conductance
         conductance = (conductanceNeutral * windspd * stabilityCorrection)
 
@@ -70,12 +63,8 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         bulkAerodynamicParameters = {
             'stabilityCorrection': stabilityCorrection,
         }
-        bulkAerodynamicDerivatives = {
-            'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
-        }
 
         return (bulkAerodynamicParameters,
-                bulkAerodynamicDerivatives,
                 conductanceSensible,
                 conductanceLatent,
                 )
@@ -93,13 +82,6 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         if stabilityCorrection < mc.machineEpsilon:
             stabilityCorrection = mc.machineEpsilon
 
-        # compute derivative in surface-atmosphere exchange coefficient w.r.t. temperature (K-1)
-        if computeDerivative:
-            dStabilityCorrection_dRich = (bprime * -2.
-                                          * (1. + bprime * RiBulk)**(-3.))
-        else:
-            dStabilityCorrection_dRich = np.nan
-
         # Calculate conductance
         conductance = (conductanceNeutral * windspd * stabilityCorrection)
         # Assume that latent and sensible heat have same conductance
@@ -110,11 +92,8 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         bulkAerodynamicParameters = {
             'stabilityCorrection': stabilityCorrection,
         }
-        bulkAerodynamicDerivatives = {
-            'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
-        }
+
         return (bulkAerodynamicParameters,
-                bulkAerodynamicDerivatives,
                 conductanceSensible,
                 conductanceLatent,
                 )
@@ -131,14 +110,6 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         if stabilityCorrection < mc.machineEpsilon:
             stabilityCorrection = mc.machineEpsilon
 
-        # compute derivative in stability correction w.r.t. temperature (K-1)
-        if computeDerivative:
-            dStabilityCorrection_dRich = (-Mahrt87_eScale
-                                          * np.exp(-Mahrt87_eScale * RiBulk)
-                                          )
-        else:
-            dStabilityCorrection_dRich = np.nan
-
         # Calculate conductance
         conductance = (conductanceNeutral * windspd * stabilityCorrection)
         # Assume that latent and sensible heat have same conductance
@@ -149,11 +120,8 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         bulkAerodynamicParameters = {
             'stabilityCorrection': stabilityCorrection,
         }
-        bulkAerodynamicDerivatives = {
-            'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
-        }
+
         return (bulkAerodynamicParameters,
-                bulkAerodynamicDerivatives,
                 conductanceSensible,
                 conductanceLatent,
                 )
@@ -222,7 +190,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
             zeta = mHeight / L
             if L >= 0.:
                 # Stable
-                psiM = Dutch(zeta)
+                psiM = Holtslag_deBruin(zeta)
             else:
                 # Unstable
                 psiM = Unstable(L, mHeight, z0Groundh, 1)
@@ -407,6 +375,9 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 # Sub-functions to Monin-Obukhov
 # ------------------------------------------------------------------------------
     def Unstable(L, Ht, zt, icall):
+        '''
+        Stability correction for unstable conditions (L < 0)
+        '''
         # Set an upper limit on function at L = -.1 or  at 200 times
         # the large -Ht/L limit where log(-4*Ht/L) is 0.  This asymptotic
         # limit is from Godfrey and Beljaars (1991).  This is a semi-
@@ -424,12 +395,62 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         return stab
 
 # ------------------------------------------------------------------------------
-    def Dutch(zeta):
+# Sub-functions to Monin-Obukhov -- Stability corrections for L > 0
+# ------------------------------------------------------------------------------
+    def Holtslag_deBruin(zeta):
+        # Note that this expression actually comes from Beljaar and
+        # Holtslag, 1991, Journal of Applied Meteorology. First formally stated
+        # in Launiainen and Vihma, 1990, Journal of Environmental Softare.
+
+        # Stability correction (Psi when expressed in MO)
         stab = (-(0.70 * zeta
                 + 0.75 * (zeta - 14.28)
                 * np.exp(-0.35 * zeta)
                 + 10.71))
-        return stab
+
+        # Derivative with respect to zeta for iterative solutions.
+        dstab_dzeta = (-0.70 - 0.75
+                       * np.exp(-0.35 * zeta)
+                       * (6. - 0.35 * zeta)
+                       )
+
+        return stab, dstab_dzeta
+
+# ------------------------------------------------------------------------------
+    def Webb(zeta):
+
+        # Stability correction (Psi when expressed in MO)
+        stab = -alpha * zeta
+
+        # Derivative with respect to zeta for iterative solutions.
+        dstab_dzeta = -alpha
+
+        return stab, dstab_dzeta
+
+# ------------------------------------------------------------------------------
+    def Beljaar_Holtslag(zeta):
+        # From Beljaar and Holtslag, 1991, Journal of Applied Meteorology.
+
+        # Constants (not tunable?)
+        a = 1.0
+        b = 0.667
+        c = 5
+        d = 0.35
+
+        # Stability correction (Psi when expressed in MO)
+        stab = (- (1. + (2. / 3.) * a * zeta) ** (3. / 2.)
+                - b * (zeta - (c / d)) * np.exp(-d * zeta)
+                - (b * c) / d + 1
+                )
+
+        # Derivative with respect to zeta for iterative solutions.
+        dstab_dzeta = (a - ((2. / 3.) * a * zeta + 1)**(1. / 2.)
+                       + b * d * np.exp(-d * zeta) * (zeta - (c / d))
+                       - b * np.exp(-d * zeta)
+                       )
+
+        return stab, dstab_dzeta
+
 
 # ------------------------------------------------------------------------------
     def andreas(ustar, z0Ground, airTemp, mHeight):
