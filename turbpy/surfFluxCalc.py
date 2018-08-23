@@ -1,11 +1,8 @@
-import turbpy.multiConst as mc
-
-
 def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
                  stabilityCorrectionParameters, senHeatGround0, latHeatGround0,
                  conductanceSensible, conductanceLatent,
                  volHeatCapacityAir, latHeatSubVapGround,
-                 latentHeatConstant, windlessExchange=True):
+                 latentHeatConstant, cap=True):
 
     # Windless exchange coefficients for water vapor, k, and heat, sk [Wm^-2]
     Ck = 0
@@ -22,7 +19,7 @@ def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
 
     ########
     # Windless Exchange -- Calculate sensible and latent heat fluxes.
-    if windlessExchange:
+    if cap == 'windless_exchange':
         # Note that the fluxes include the windless exchange coefficients.
         latHeatGround = Ck + latHeatGround0
         if L >= 0:
@@ -45,7 +42,7 @@ def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
 
     ########
     # NO Windless Exchange -- Calculate sensible and latent heat fluxes.
-    elif not windlessExchange:
+    else:
         # Note that the fluxes include the windless exchange coefficients.
         latHeatGround = Ck + latHeatGround0
         if L >= 0:
@@ -66,7 +63,8 @@ def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
     ########
     # Back out new conductance
     conductanceSensible = senHeatGround / volHeatCapacityAir
-    conductanceLatent = latHeatGround / (latentHeatConstant * conductanceLatent)
+    conductanceLatent = latHeatGround / (latentHeatConstant
+                                         * conductanceLatent)
 
     ########
     # Convert to fluxes

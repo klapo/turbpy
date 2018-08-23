@@ -4,12 +4,10 @@ from turbpy.bulkRichardson import bulkRichardson
 import turbpy.multiConst as mc
 
 
-def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
-               airVaporPress, sfcTemp, sfcVaporPress, windspd, z0Ground):
+def aStability(param_dict, mHeight, airTemp, airVaporPress,
+               sfcTemp, sfcVaporPress, windspd, z0Ground):
     '''
-    computeDerivative:      logical flag to compute analytical derivatives
-    ixStability             choice of stability function
-    ixStabParam             Variable holding stability scheme parameters
+    param_dict              Variable holding stability scheme parameters
                             (multi-level dictionary with upper level key the
                             same as ixStability)
     mHeight                 measurement height above the surface (m)
@@ -22,28 +20,15 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
     '''
 
 # ------------------------------------------------------------------------------
-# Error handling for a non-recognized stability method
-# ------------------------------------------------------------------------------
-    ' Stability Error Message '
-    def stabErrMess():
-        raise ValueError(
-            'Unrecognized stability choice: '
-            + ixStability
-            + '\n'
-            + 'Valid stability options: '
-            + stabilityCase.keys()
-        )
-
-# ------------------------------------------------------------------------------
 # Sub-functions (stability schemes)
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
 # "standard" stability correction (Anderson/Webb/log-linear)
 # ------------------------------------------------------------------------------
-    def standard(stabParams=mc.stabParams):
+    def standard(stabParams=param_dict):
         # Assign parameter value
-        critRichNumber = stabParams['standard']
+        critRichNumber = stabParams['stability_params']['standard']
 
         # compute surface-atmosphere exchange coefficient (-)
         if RiBulk < critRichNumber:
@@ -72,9 +57,9 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 # ------------------------------------------------------------------------------
 # Louis 1979
 # ------------------------------------------------------------------------------
-    def louisInversePower(stabParams=mc.stabParams):
+    def louisInversePower(stabParams=param_dict):
         # Grab paramter values
-        Louis79_bparam = stabParams['louisInversePower']
+        Louis79_bparam = stabParams['stability_params']['louisInversePower']
 
         # compute surface-atmosphere exchange coefficient (-)
         bprime = Louis79_bparam / 2.
@@ -101,9 +86,9 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 # ------------------------------------------------------------------------------
 # Mahrt 1987
 # ------------------------------------------------------------------------------
-    def mahrtExponential(stabParams=mc.stabParams):
+    def mahrtExponential(stabParams=param_dict):
         # Grab stab params
-        Mahrt87_eScale = stabParams['mahrtExponential']
+        Mahrt87_eScale = stabParams['stability_params']['mahrtExponential']
 
         # compute surface-atmosphere exchange coefficient (-)
         stabilityCorrection = np.exp(-Mahrt87_eScale * RiBulk)
@@ -129,8 +114,23 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 # ------------------------------------------------------------------------------
 # Monin-Obukhov stability as implemented in SNTHERM
 # ------------------------------------------------------------------------------
-    def moninObukhov(stabParams=mc.stabParams, z0Ground=z0Ground):
+    def moninObukhov(stabParams=param_dict, z0Ground=z0Ground):
+
         # Grab paramter values (none used in MO method as implmented currently)
+
+        # Make dictionary of stability methods available.
+        gradient_methods = {'Holtslag_deBruin': Holtslag_deBruin,
+                            'Beljaar_Holtslag': Beljaar_Holtslag,
+                            'Webb': Webb
+                            }
+
+        # Determine which gradient function the user wants to use. The default
+        # Holtslag and de Bruin (1988).
+        gradfunc = stabParams['monin_obukhov']['gradient_function']
+        gradient_function = gradient_methods.get(gradfunc)
+
+        # Determine if we need to enact any capping
+        cap = stabParams['monin_obukhov']['capping']
 
         # Assume surface drag is equal between momentum, heat, and moisture
         z0Groundw = z0Ground
@@ -153,7 +153,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         psiH = 0.					# Stability function for heat
         psiQ = 0.					# Stability function for water vapor
         deltaT = airTemp - sfcTemp
-        deltaE = (airVaporPress - sfcVaporPress) / 100.  # Convert [Pa] -> [hPa]
+        deltaE = (airVaporPress - sfcVaporPress) / 100.  # Convert Pa -> hPa
         Tbar = (airTemp + sfcTemp) / 2.
         zetaT = RiBulk * dlogW      # Stability parameter
         L = mHeight / zetaT 		# Obukhov height
@@ -164,7 +164,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
             # Newton-Raphson iterative loop. Loop at least twice.
             if it == 0:
                 # Initial pass
-                if RiBulk > 1.427:
+                if RiBulk > 1.427 and gradfunc == 'Holtslag_deBruin':
                     # Exceeds critical Richardson number
                     # Decouple the atmosphere and land surface
                     conductanceSensible = mc.machineEpsilon
@@ -180,17 +180,26 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                                               'freelimv': 0.,
                                               'stabilityCorrection': np.nan,
                                               }
-                    moninObukhovDerivatives = {}
-                    return (moninObukhovParameters, moninObukhovDerivatives,
-                            conductanceSensible, conductanceLatent)
+                    return (moninObukhovParameters,
+                            conductanceSensible,
+                            conductanceLatent)
 
             #########
             # a. Compute momentum stability functions, transfer coefficient Cd,
             # and friction veolocity ustar
             zeta = mHeight / L
+
+            # Enact applicable capping
+            if cap == 'obukhov_length_capping':
+                if L > 1:
+                    L = 1
+            elif cap == 'zeta_capping':
+                if zeta > 2:
+                    zeta = 2
+
             if L >= 0.:
                 # Stable
-                psiM = Holtslag_deBruin(zeta)
+                psiM, DpsitDzetaT = gradient_function(zeta, stabParams)
             else:
                 # Unstable
                 psiM = Unstable(L, mHeight, z0Groundh, 1)
@@ -259,13 +268,14 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                                           'freelimv': freelimv,
                                           'stabilityCorrection': np.nan,
                                           }
-                moninObukhovDerivatives = {}
-                return (moninObukhovParameters, moninObukhovDerivatives,
-                        conductanceSensible, conductanceLatent)
+                return (moninObukhovParameters,
+                        conductanceSensible,
+                        conductanceLatent)
 
             elif L < 0. and L > -1.0:
                 # Very unstable:
-                # Compute free convection limits.  Applies generally for L < -0.1
+                # Compute free convection limits.  Applies generally for
+                # L < -0.1
                 # Andreas and Cash, Convective heat transfer over wintertime
                 # leads and polynyas, JGR 104, C11, 25,721-25,734, 1999.
                 # Method is for a smooth surface with unlimited fetch.
@@ -316,9 +326,9 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                                           'freelimv': freelimv,
                                           'stabilityCorrection': np.nan,
                                           }
-                moninObukhovDerivatives = {}
-                return (moninObukhovParameters, moninObukhovDerivatives,
-                        conductanceSensible, conductanceLatent)
+                return (moninObukhovParameters,
+                        conductanceSensible,
+                        conductanceLatent)
             if it >= numMaxIterations - 1:
                 # NOT within tolerance, leave loop
                 conductanceSensible = (mc.vkc**2.
@@ -338,21 +348,16 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
                                           'freelimv': freelimv,
                                           'stabilityCorrection': np.nan,
                                           }
-                moninObukhovDerivatives = {}
-                return (moninObukhovParameters, moninObukhovDerivatives,
-                        conductanceSensible, conductanceLatent)
+                return (moninObukhovParameters,
+                        conductanceSensible,
+                        conductanceLatent)
             #########
             # f. Use Newton-Raphson scheme for stable
             # sequential estimates for unstable
             if L >= 0.:
-                # Next is derivative of Psi
-                DpsitDzetaT = (-0.70 - 0.75
-                               * np.exp(-0.35 * zetaT)
-                               * (6. - 0.35 * zetaT)
-                               )
-                DpsiMDzetaT = (-0.70 - 0.75
-                               * np.exp(-0.35 * zeta)
-                               * (6. - 0.35 * zeta))
+                # Next is derivative of Psi (returned from the
+                # gradient functions)
+                DpsiMDzetaT = DpsitDzetaT
                 dumM = 1. / (dlogW - psiM)
                 dumT = 1. / (dlogT - psiH)
                 # Derivative of y (ignoring humidity effects)
@@ -397,7 +402,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 # ------------------------------------------------------------------------------
 # Sub-functions to Monin-Obukhov -- Stability corrections for L > 0
 # ------------------------------------------------------------------------------
-    def Holtslag_deBruin(zeta):
+    def Holtslag_deBruin(zeta, stabParams):
         # Note that this expression actually comes from Beljaar and
         # Holtslag, 1991, Journal of Applied Meteorology. First formally stated
         # in Launiainen and Vihma, 1990, Journal of Environmental Softare.
@@ -417,7 +422,8 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         return stab, dstab_dzeta
 
 # ------------------------------------------------------------------------------
-    def Webb(zeta):
+    def Webb(zeta, stabParams):
+        alpha = stabParams['stability_params']['Webb']
 
         # Stability correction (Psi when expressed in MO)
         stab = -alpha * zeta
@@ -428,7 +434,7 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         return stab, dstab_dzeta
 
 # ------------------------------------------------------------------------------
-    def Beljaar_Holtslag(zeta):
+    def Beljaar_Holtslag(zeta, stabParams):
         # From Beljaar and Holtslag, 1991, Journal of Applied Meteorology.
 
         # Constants (not tunable?)
@@ -513,34 +519,27 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
 
 # ------------------------------------------------------------------------------
     # Dictionary to stability function calls
-    stabilityCase = {
-        'standard': standard,
-        'louisInversePower': louisInversePower,
-        'mahrtExponential': mahrtExponential,
-        'moninObukhov': moninObukhov,
-        }
+    stabilityCase = {'standard': standard,
+                     'louis': louisInversePower,
+                     'mahrt': mahrtExponential,
+                     'monin_obukhov': moninObukhov,
+                     }
 
     ########
     # Determine atmospheric stability
     # compute the bulk Richardson number (-)
-    bulkRichardsonOut = bulkRichardson(
-        airTemp,                        # air temperature (K)
-        sfcTemp,                        # surface temperature (K)
-        windspd,                        # wind speed (m s-1)
-        mHeight,                        # measurement height (m)
-        computeDerivative,              # flag to compute the derivative
-        )
-
-    (RiBulk,                                    # bulk Richardson number (-)
-        dRiBulk_dAirTemp,                       # derivative in the bulk Richardson number w.r.t. air temperature (K-1)
-        dRiBulk_dSfcTemp) = bulkRichardsonOut   # derivative in the bulk Richardson number w.r.t. surface temperature (K-1)
+    RiBulk = bulkRichardson(airTemp,  # air temperature (K)
+                            sfcTemp,  # surface temperature (K)
+                            windspd,  # wind speed (m s-1)
+                            mHeight,  # measurement height (m)
+                            )
 
     # Conductance under conditions of neutral stability (-)
     conductanceNeutral = (mc.vkc**2.) / (np.log((mHeight) / z0Ground)**2.)
 
     #########
     # Stability Corrections
-    if RiBulk < 0. and 'moninObukhov' not in ixStability:
+    if RiBulk < 0. and not param_dict['stability_method'] == 'monin_obukhov':
         #########
         # Unstable
         stabilityCorrection = (1. - 16. * RiBulk)**(0.5)
@@ -552,60 +551,19 @@ def aStability(computeDerivative, ixStability, ixStabParam, mHeight, airTemp,
         stabilityCorrectionParameters = {
             'stabilityCorrection': stabilityCorrection}
 
-        # compute derivative in stability  w.r.t. temperature (K-1)
-        if computeDerivative:
-            dStabilityCorrection_dRich = ((-16.) * 0.5
-                                          * (1. - 16. * RiBulk)**(-0.5))
-            dStabilityCorrection_dAirTemp = (dRiBulk_dAirTemp
-                                             * dStabilityCorrection_dRich)
-            dStabilityCorrection_dSfcTemp = (dRiBulk_dSfcTemp
-                                             * dStabilityCorrection_dRich)
-        else:
-            # set derivative to nan if not computing
-            dStabilityCorrection_dAirTemp = np.nan
-            dStabilityCorrection_dSfcTemp = np.nan
-            dStabilityCorrection_dRich = np.nan
-
-        # Collect derivatives for output.
-        stabilityCorrectionDerivatives = {
-            'dStabilityCorrection_dAirTemp': dStabilityCorrection_dAirTemp,
-            'dStabilityCorrection_dSfcTemp': dStabilityCorrection_dSfcTemp,
-            'dStabilityCorrection_dRich': dStabilityCorrection_dRich,
-        }
     else:
         ########
         # Stable cases
         # Use a dictionary of functions to select stability function.
-        func = stabilityCase.get(ixStability, stabErrMess)
+        func = stabilityCase.get(param_dict['stability_method'])
         (stabilityCorrectionParameters,
-         stabilityCorrectionDerivatives,
          conductanceSensible,
-         conductanceLatent) = func(stabParams=ixStabParam)
-
-        ########
-        # Derivatives
-        if computeDerivative:
-            # Derivative of stability functions w.r.t. airTemp and sfcTemp
-            dStabilityCorrection_dAirTemp = (dRiBulk_dAirTemp
-                                             * dStabilityCorrection_dRich)
-            dStabilityCorrection_dSfcTemp = (dRiBulk_dSfcTemp
-                                             * dStabilityCorrection_dRich)
-        else:
-            # set derivative to nan if not computing
-            dStabilityCorrection_dAirTemp = np.nan
-            dStabilityCorrection_dSfcTemp = np.nan
-
-        # Collect derivatives into dictionary
-        stabilityCorrectionDerivatives['dStabilityCorrection_dAirTemp'] = \
-            dStabilityCorrection_dAirTemp
-        stabilityCorrectionDerivatives['dStabilityCorrection_dSfcTemp'] = \
-            dStabilityCorrection_dSfcTemp
+         conductanceLatent) = func(stabParams=param_dict)
 
     # Add neutral conductance to output dictionary
     stabilityCorrectionParameters['conductanceNeutral'] = conductanceNeutral
     return (RiBulk,
             stabilityCorrectionParameters,
-            stabilityCorrectionDerivatives,
             conductanceSensible,
             conductanceLatent,
             )

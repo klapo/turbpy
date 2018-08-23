@@ -2,30 +2,26 @@ import numpy as np
 
 import turbpy.multiConst as mc
 from turbpy.aStability import aStability
+from turbpy.parameter_methods import get_params
 from turbpy import surfFluxCalc
 
 
-def turbFluxes(
-        airTemp,                            # air temperature at some height above the surface (K)
-        airPres,                            # air pressure of the air above the vegetation canopy (Pa)
-        airVaporPress,                      # vapor pressure of the air above the vegetation canopy (Pa)
-        windspd,                            # wind speed above the canopy (m s-1)
-        sfcTemp,                            # ground temperature (K)
-        sfcVaporPress,                      # Vapor pressure at the surface (Pa)
-        snowDepth,                          # depth of snow (m)
-        mHeight,                            # height of observations (m)
-        groundSnowFraction=1,               # Fraction of ground covered by snow (-)
-        ixDerivMethod=False,                # choice of method used to compute derivative (analytical or numerical)
-        ixStability='standard',             # method for calculating stability
-        ixStabParam=mc.stabParams,          # Stability params from mc library
-        z0Ground=.005,                      # Surface roughness length for log-layer (m)
-        windlessExchange=True,              # Enforce windless exchange minimum sensible heat flux
-):
+def turbFluxes(airTemp,  # air temperature at some height above the surface (K)
+               airPres,  # air pressure of the air above the vegetation canopy (Pa)
+               airVaporPress,  # vapor pressure of the air above the vegetation canopy (Pa)
+               windspd,  # wind speed above the canopy (m s-1)
+               sfcTemp,  # ground temperature (K)
+               sfcVaporPress,  # Vapor pressure at the surface (Pa)
+               snowDepth,  # depth of snow (m)
+               mHeight,  # height of observations (m)
+               groundSnowFraction=0,  # Fraction of surface covered by snow (-). Used in latent heat calculation.
+               param_dict=None,  # dictionary of parameters and parameterizations
+               z0Ground=.005,  # Surface roughness length for log-layer (m)
+               ):
     '''
     turbFluxes.py
 
-    Offline turbulent fluxes for non-canopy surfaces. Python companion code for
-    the SUMMA model. https://github.com/NCAR/summa
+    Offline turbulent fluxes for non-canopy, relatively smooth surfaces (e.g., snow)
 
     INPUT:
         airTemp (K), airPres (Pa), airVaporPress (Pa), windspd (m s-1), sfcTemp (K),
@@ -34,12 +30,8 @@ def turbFluxes(
         mHeight (m)
             - height of atmospheric observations. All observations assumed to come
              from same height at the moment.
-        ixDerivMethod (analytical, numerical, or False)
-            - model control on how derivatives are computeDerivative
-        ixStability (see multiConst.py for options)
-            - stability scheme method (string)
-        ixStabParam (see multiConst.py for default values)
-            - Parameter values for the stability scheme.
+        param_dict
+            - Dictionary containing the choices for simulating turbulence.
         z0Ground (m)
             - surface roughness length
 
@@ -49,16 +41,21 @@ def turbFluxes(
         senHeatGround - sensible heat flux from ground surface (W m-2)
         latHeatGround - latent heat flux from ground surface (W m-2)
         turbFluxGround - net turbulent heat fluxes at the ground surface (W m-2)
-        dTurbFluxGround_dTGround - derivative in net turbulent fluxes w.r.t. ground temperature (W m-2 K-1)
     '''
-# --------------------------------------------------------------------------------------------------------------------
-    if np.isnan(airTemp) or np.isnan(airPres) or np.isnan(airVaporPress) or np.isnan(sfcTemp):
+
+    # Check for the forcing data
+    if np.isnan(airTemp) or np.isnan(airPres)\
+       or np.isnan(airVaporPress) or np.isnan(sfcTemp):
         raise ValueError('Input data includes nan value.')
-    # check that measurement height above the ground surface is above the roughness length
+    # Check that measurement height above the ground surface is above
+    # the roughness length.
     if mHeight < snowDepth + z0Ground:
         raise ValueError('measurement height < snow depth + roughness length')
-    # define height above the snow surface
+    # Define height above the snow surface.
     heightAboveGround = mHeight - snowDepth
+
+    # Get the parameters for running turbpy.
+    param_dict = get_params(param_dict)
 
     ########
     # Local variables
@@ -79,89 +76,55 @@ def turbFluxes(
 
     ########
     # compute resistances
-    if ixDerivMethod:
-        derivDesired = ('analytical' in ixDerivMethod
-                        or 'numerical' in ixDerivMethod)
-    else:
-        derivDesired = False
-
     stabOut = aStability(
-        derivDesired,               # flag for derivatives
-        ixStability,                # choice of stability function
-        ixStabParam,                # Parameters dictionary
-        heightAboveGround,          # measurement height (m)
-        airTemp,                    # air temperature @ mHeight (K)
-        airVaporPress,              # vapor pressure @ mHeight (Pa)
-        sfcTemp,                    # ground temperature (K)
-        sfcVaporPress,              # vapor pressure @ surface (Pa)
-        windspd,                    # wind speed at @ mHeight (m s-1)
-        z0Ground,                   # surface roughness length (m)
+        param_dict,                # parameter defining dictionary
+        heightAboveGround,         # measurement height (m)
+        airTemp,                   # air temperature @ mHeight (K)
+        airVaporPress,             # vapor pressure @ mHeight (Pa)
+        sfcTemp,                   # ground temperature (K)
+        sfcVaporPress,             # vapor pressure @ surface (Pa)
+        windspd,                   # wind speed at @ mHeight (m s-1)
+        z0Ground,                  # surface roughness length (m)
     )
 
     # Unpack conductances
     (RiBulkGround, stabilityCorrectionParameters,
-        stabilityCorrectionDerivatives, conductanceSensible,
-        conductanceLatent) = stabOut
+     conductanceSensible, conductanceLatent) = stabOut
 
     ########
     # compute sensible and latent heat fluxes (positive downwards)
     # Turbulent fluxes using bulk aerodynamic stability corrections.
-    if 'moninObukhov' in ixStability:
+    if param_dict['stability_method'] == 'monin_obukhov':
         # MO uses a windless exchange coefficient for stable conditions
         # Pass in the "wind function" to calculate fluxes.
         senHeatGround = volHeatCapacityAir * conductanceSensible
         latHeatGround = latHeatSubVapGround * latentHeatConstant * \
             conductanceLatent
+
+        # Determine capping behavior
+        cap = param_dict['monin_obukhov']['capping']
+
         # Turbulent fluxes for Monin-Obukhov similarity theory
-        senHeatGround, latHeatGround, conductanceSensible, conductanceLatent = \
+        (senHeatGround, latHeatGround,
+         conductanceSensible, conductanceLatent) = \
             surfFluxCalc.moninObukhov(airTemp, airVaporPress,
-                                      sfcTemp, sfcVaporPress, stabilityCorrectionParameters,
+                                      sfcTemp, sfcVaporPress,
+                                      stabilityCorrectionParameters,
                                       senHeatGround, latHeatGround,
                                       conductanceSensible, conductanceLatent,
                                       volHeatCapacityAir, latHeatSubVapGround,
-                                      latentHeatConstant, windlessExchange)
+                                      latentHeatConstant, cap)
     else:
-        senHeatGround = -volHeatCapacityAir * conductanceSensible * \
-            (sfcTemp - airTemp)
-        latHeatGround = -latHeatSubVapGround * latentHeatConstant * \
-            conductanceLatent * (sfcVaporPress - airVaporPress)
-
-    # compute derivatives
-    # if ixDerivMethod == 'analytical' and not ixStability == 'moninObukhov':
-    # compute derivatives for the ground fluxes w.r.t. ground temperature
-    # d(ground sensible heat flux)/d(ground temp)
-    # dSenHeatGround_dTGround = (-volHeatCapacityAir *
-    #     dGroundCondSH_dGroundTemp) *\
-    #     (sfcTemp - airTemp) + \
-    #     (-volHeatCapacityAir * groundConductanceSH)
-    # d(ground latent heat flux)/d(ground temp)
-    # dLatHeatGround_dTGround = (-latHeatSubVapGround * latentHeatConstant *
-    #     dGroundCondLH_dGroundTemp) * \
-    #     (satVP_GroundTemp * soilRelHumidity - airVaporPress) + \
-    #     (-latHeatSubVapGround * latentHeatConstant * groundConductanceLH) *\
-    #     dSVPGround_dGroundTemp * soilRelHumidity
-
-    ########
-    # net turbulent flux at the ground surface (W m-2)
-    turbFluxGround = senHeatGround + latHeatGround
-
-    # compute derivatives
-    # if ixDerivMethod == 'analytical':
-    #     # (energy derivatives)
-    #     # derivative in net ground turbulent fluxes w.r.t. ground temperature (W m-2 K-1)
-    #     dTurbFluxGround_dTGround = dSenHeatGround_dTGround + \
-    #         dLatHeatGround_dTGround
-    # else:
-    #     dTurbFluxGround_dTGround = -9999
+        senHeatGround = (-volHeatCapacityAir * conductanceSensible *
+                         (sfcTemp - airTemp))
+        latHeatGround = (-latHeatSubVapGround * latentHeatConstant *
+                         conductanceLatent * (sfcVaporPress - airVaporPress))
 
     return (
         conductanceSensible,  # ground conductance for sensible heat (m s-1)
         conductanceLatent,  # ground conductance for latent heat (m s-1)
         senHeatGround,  # sensible heat flux from ground surface (W m-2)
         latHeatGround,  # latent heat flux from ground surface (W m-2)
-        turbFluxGround,  # net turbulent heat fluxes at the ground surface (W m-2)
         stabilityCorrectionParameters,  # Stability correction (0-1)
-        stabilityCorrectionDerivatives,
-        np.nan,  # derivative in net turbulent fluxes w.r.t. ground temperature (W m-2 K-1)
+        param_dict  # Return the parameterizations used in this run.
     )
-###########################################################################################################
