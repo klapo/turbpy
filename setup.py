@@ -10,8 +10,10 @@ except:
     from distutils.extension import Extension
 
 setup(name='turbpy',
-   author="Karl Lapo",
-   author_email="karl.lapo@uni-bayreuth.de",
-   description="Turbulence related functions for land surface models",
-   version='1.0',
-   packages=["turbpy"])
+      author="Karl Lapo",
+      author_email="karl.lapo@uni-bayreuth.de",
+      description="Turbulence related functions for land surface models",
+      version='1.0',
+      packages=['turbpy'],
+      package_data={'turbpy': ['default_params.yml']},
+      )
