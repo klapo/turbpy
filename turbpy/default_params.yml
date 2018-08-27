@@ -5,32 +5,58 @@
 # below. If monin_obukhov, turbpy searches for parameter values to run the
 # method. Default is standard.
 stability_method: 'standard'
+# Methods available within turbpy
 available_stab_methods:
     - 'standard'
     - 'louis'
     - 'mahrt'
     - 'monin_obukhov'
+# Determine if/which MO capping behavior is used.
+capping: no_capping
+available_capping:
+    - no_capping
+    # Capping as implemented in CROCUS and described
+    # by Martin and Lejuene (1998)
+    - louis_Ri_capping
+    # Available options for monin-obukhov
+    # Apply the windless exchange as implemented in SNTHERM
+    - windless_exchange
+    # The NoahMP approach (caps L at a value of 1)
+    - obukhov_length_capping
+    # The CLMv4.5 approach (caps zeta at a value of 2)
+    - zeta_capping
+    # No capping (implement as in theory)
+    - no_capping
+    # Minimum wind speed of 1 m/s. This is the default behavior of
+    # the webb_noahmp gradient function.
+    - minimum_wind
 
 # ------------------------------------------------------------------------------
 stability_params:
     # critical value for the bulk Richardson number (-)
     standard: 0.2
     # parameter in Louis (1979) stability function. This value is
-    # divided by two.
-    louisInversePower: 9.4
+    # divided by two to convert from b to b`.
+    louis: 9.4
     # exponential scaling factor in the Mahrt (1987) stability function
-    mahrtExponential: 1.
+    mahrt: 1.
     # Inverse of the critical Richardson number (for MO Webb scheme).
     # This is the alpha value. Note, that it is formulated identical
     # to the standard scheme
-    Webb: 5
+    webb: 5
 
 # ------------------------------------------------------------------------------
 # Parameters specifying how to run the MO scheme.
 monin_obukhov:
-    # Determine if/which capping behavior is used.
-    capping: 'no_capping'
-    # Available options
+    # Select how the stability correciton is parameterized for the
+    # Monin-Obukhov approach. The options are displayed below.
+    gradient_function: 'holtslag_debruin'
+    available_gradient_funcs:
+        - 'holtslag_debruin'
+        - 'webb'
+        - 'beljaar_holtslag'
+        - 'webb_noahmp'
+        # Available options for monin-obukhov
     available_capping:
         # Apply the windless exchange as implemented in SNTHERM
         - windless_exchange
@@ -40,11 +66,5 @@ monin_obukhov:
         - zeta_capping
         # No capping (implement as in theory)
         - no_capping
-
-    # Select how the stability correciton is parameterized for the
-    # Monin-Obukhov approach. The options are displayed below.
-    gradient_function: 'Holtslag_deBruin'
-    available_gradient_funcs:
-        - 'Holtslag_deBruin'
-        - 'Webb'
-        - 'Beljaar_Holtslag'
+        # Minimum wind speed
+        - minimum_wind

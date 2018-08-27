@@ -1,5 +1,6 @@
 import yaml
 import os
+import pkg_resources
 
 
 def yaml_dict(yaml_path):
@@ -27,7 +28,9 @@ def get_params(param_dict):
     '''
 
     # Get the default parameter/parameterizations.
-    defaults = yaml_dict('default_params.yml')
+    defaults_yml = pkg_resources.resource_filename('turbpy',
+                                                   'default_params.yml')
+    defaults = yaml_dict(defaults_yml)
     # Initialize the output parameter dictionary
     out_param_dict = defaults
 
@@ -39,10 +42,9 @@ def get_params(param_dict):
 
     # Determine if the stability method name matches the names available.
     if stab_method not in defaults['available_stab_methods']:
-        print('Unrecognized stability choice: '
-              + stab_method
-              + '\nValid stability options: '
-              + ', '.join(defaults['available_stab_methods']))
+        raise ValueError('Unrecognized stability choice: ' + stab_method
+                         + '\nValid stability options: '
+                         + ', '.join(defaults['available_stab_methods']))
 
     # Determine any tunable parameters.
     methods_need_params = ['standard', 'louis', 'mahrt']
@@ -51,6 +53,21 @@ def get_params(param_dict):
             stab_param = param_dict['stability_params'][stab_method]
         except KeyError:
             stab_param = defaults['stability_params'][stab_method]
+
+    # Find out what capping should be used.
+    try:
+        capping = param_dict['capping']
+    except KeyError:
+        capping = defaults['capping']
+    # Determine if the capping option is correct
+    if capping not in defaults['available_capping']:
+        raise ValueError('Unrecognized capping choice: ' + capping
+                         + '\nValid stability options: '
+                         + ', '.join(defaults['available_capping']))
+
+    if capping == 'louis_Ri_capping' and not stab_method == 'louis':
+        raise ValueError('Louis capping (MJ98) can only be implemented \
+                          with the Louis stability scheme.')
 
     # Deal with Monin-Obukhov method implementation seperately.
     if stab_method == 'monin_obukhov':
@@ -62,39 +79,33 @@ def get_params(param_dict):
 
         # Determine if the gradient function name is correct
         if gradient_function not in defaults['monin_obukhov']['available_gradient_funcs']:
-            print('Unrecognized gradient function choice for Monin-Obukhov: '
-                  + gradient_function
-                  + '\nValid stability options: '
-                  + ', '.join(defaults['monin_obukhov']['available_gradient_funcs']))
+            raise ValueError('Unrecognized gradient function choice\
+                             for Monin-Obukhov: ' + gradient_function
+                             + '\nValid stability options: '
+                             + ', '.join(defaults['monin_obukhov']['available_gradient_funcs']))
 
         # Catch the one case with a tunable parameter.
-        if gradient_function == 'Webb':
+        if gradient_function == 'webb':
             try:
-                stab_param = param_dict['stability_params']['Webb']
+                stab_param = param_dict['stability_params']['webb']
             except KeyError:
-                stab_param = defaults['stability_params']['Webb']
+                stab_param = defaults['stability_params']['webb']
         else:
             stab_param = None
 
-        # Find out what capping should be used.
-        try:
-            capping = param_dict['monin_obukhov']['capping']
-        except KeyError:
-            capping = defaults['monin_obukhov']['capping']
-
         # Determine if the capping option is correct
-        if capping not in defaults['monin_obukhov']['capping']:
-            print('Unrecognized capping choice for Monin-Obukhov: '
-                  + capping
-                  + '\nValid stability options: '
-                  + ', '.join(defaults['monin_obukhov']['available_capping']))
+        if capping not in defaults['monin_obukhov']['available_capping']:
+            raise ValueError('Unrecognized capping choice for Monin-Obukhov: '
+                             + capping
+                             + '\nValid stability options: '
+                             + ', '.join(defaults['monin_obukhov']['available_capping']))
 
         # Assign MO values to the parameter dictionary to return to turbpy
         out_param_dict['monin_obukhov']['gradient_function'] = gradient_function
         out_param_dict['monin_obukhov']['capping'] = capping
 
     # Assign last values for returning.
-    out_param_dict['stability_methods'] = stab_method
+    out_param_dict['stability_method'] = stab_method
     out_param_dict['stability_params'][stab_method] = stab_param
 
     return(out_param_dict)
