@@ -59,16 +59,30 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
 # ------------------------------------------------------------------------------
     def louisInversePower(stabParams=param_dict):
         # Grab paramter values
-        Louis79_bparam = stabParams['stability_params']['louisInversePower']
+        Louis79_bparam = stabParams['stability_params']['louis']
+
+        # Determine if we need to enact any capping
+        cap = stabParams['capping']
+
+        # For some reason the expression is a function of b, but bprime = b/2
+        # is the relevant quantity.
+        bprime = Louis79_bparam / 2.
+
+        # Enact applicable capping. Set RiBulk to a constant value if capping
+        # enacted. Else, RiBulk_louis is just the computer bulk Richardson.
+        if cap == 'louis_Ri_capping' and RiBulk > 0.026:
+            RiBulk_louis = 0.026
+        else:
+            RiBulk_louis = RiBulk
 
         # compute surface-atmosphere exchange coefficient (-)
-        bprime = Louis79_bparam / 2.
-        stabilityCorrection = 1. / ((1. + bprime * RiBulk)**2.)
+        stabilityCorrection = 1. / ((1. + bprime * RiBulk_louis)**2.)
         if stabilityCorrection < mc.machineEpsilon:
             stabilityCorrection = mc.machineEpsilon
 
         # Calculate conductance
         conductance = (conductanceNeutral * windspd * stabilityCorrection)
+
         # Assume that latent and sensible heat have same conductance
         conductanceSensible = conductance
         conductanceLatent = conductance
@@ -88,7 +102,7 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
 # ------------------------------------------------------------------------------
     def mahrtExponential(stabParams=param_dict):
         # Grab stab params
-        Mahrt87_eScale = stabParams['stability_params']['mahrtExponential']
+        Mahrt87_eScale = stabParams['stability_params']['mahrt']
 
         # compute surface-atmosphere exchange coefficient (-)
         stabilityCorrection = np.exp(-Mahrt87_eScale * RiBulk)
@@ -119,9 +133,10 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         # Grab paramter values (none used in MO method as implmented currently)
 
         # Make dictionary of stability methods available.
-        gradient_methods = {'Holtslag_deBruin': Holtslag_deBruin,
-                            'Beljaar_Holtslag': Beljaar_Holtslag,
-                            'Webb': Webb
+        gradient_methods = {'holtslag_debruin': holtslag_debruin,
+                            'beljaar_holtslag': beljaar_holtslag,
+                            'webb': webb,
+                            'webb_noahmp': webb_noahmp,
                             }
 
         # Determine which gradient function the user wants to use. The default
@@ -130,7 +145,7 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         gradient_function = gradient_methods.get(gradfunc)
 
         # Determine if we need to enact any capping
-        cap = stabParams['monin_obukhov']['capping']
+        cap = stabParams['capping']
 
         # Assume surface drag is equal between momentum, heat, and moisture
         z0Groundw = z0Ground
@@ -164,7 +179,7 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
             # Newton-Raphson iterative loop. Loop at least twice.
             if it == 0:
                 # Initial pass
-                if RiBulk > 1.427 and gradfunc == 'Holtslag_deBruin':
+                if RiBulk > 1.427 and gradfunc == 'holtslag_debruin':
                     # Exceeds critical Richardson number
                     # Decouple the atmosphere and land surface
                     conductanceSensible = mc.machineEpsilon
@@ -187,10 +202,12 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
             #########
             # a. Compute momentum stability functions, transfer coefficient Cd,
             # and friction veolocity ustar
+            if L == 0:
+                L = mc.machineEpsilon
             zeta = mHeight / L
 
             # Enact applicable capping
-            if cap == 'obukhov_length_capping':
+            if cap == 'obukhov_length_capping' or gradfunc == 'webb_noahmp':
                 if L > 1:
                     L = 1
             elif cap == 'zeta_capping':
@@ -402,7 +419,7 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
 # ------------------------------------------------------------------------------
 # Sub-functions to Monin-Obukhov -- Stability corrections for L > 0
 # ------------------------------------------------------------------------------
-    def Holtslag_deBruin(zeta, stabParams):
+    def holtslag_debruin(zeta, stabParams):
         # Note that this expression actually comes from Beljaar and
         # Holtslag, 1991, Journal of Applied Meteorology. First formally stated
         # in Launiainen and Vihma, 1990, Journal of Environmental Softare.
@@ -422,8 +439,8 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         return stab, dstab_dzeta
 
 # ------------------------------------------------------------------------------
-    def Webb(zeta, stabParams):
-        alpha = stabParams['stability_params']['Webb']
+    def webb(zeta, stabParams):
+        alpha = stabParams['stability_params']['webb']
 
         # Stability correction (Psi when expressed in MO)
         stab = -alpha * zeta
@@ -434,7 +451,27 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         return stab, dstab_dzeta
 
 # ------------------------------------------------------------------------------
-    def Beljaar_Holtslag(zeta, stabParams):
+    def webb_noahmp(zeta, stabParams):
+        '''
+        Gradient function as implemented in NoahMP
+        '''
+        alpha = stabParams['stability_params']['webb']
+
+        # Stability correction (Psi when expressed in MO)
+        if zeta >= 0 and zeta <= 1:
+            stab = -alpha * zeta
+            # Derivative with respect to zeta for iterative solutions.
+            dstab_dzeta = -alpha
+
+        # Separate case for very stable conditions
+        elif zeta > 1:
+            stab = (1 - alpha) * np.log(zeta) + zeta
+            dstab_dzeta = (1 - alpha + zeta) / zeta
+
+        return stab, dstab_dzeta
+
+# ------------------------------------------------------------------------------
+    def beljaar_holtslag(zeta, stabParams):
         # From Beljaar and Holtslag, 1991, Journal of Applied Meteorology.
 
         # Constants (not tunable?)
@@ -450,11 +487,13 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                 )
 
         # Derivative with respect to zeta for iterative solutions.
-        dstab_dzeta = (a - ((2. / 3.) * a * zeta + 1)**(1. / 2.)
-                       + b * d * np.exp(-d * zeta) * (zeta - (c / d))
-                       - b * np.exp(-d * zeta)
+        # dstab_dzeta = (a - ((2. / 3.) * a * zeta + 1)**(1. / 2.)
+        #                + b * d * np.exp(-d * zeta) * (zeta - (c / d))
+        #                - b * np.exp(-d * zeta)
+        #                )
+        dstab_dzeta = (b * np.exp(-d * zeta) * (d * zeta - 1 - c)
+                       - a * (2. / 3. * a * zeta + 1)**(1./2.)
                        )
-
         return stab, dstab_dzeta
 
 
@@ -528,6 +567,8 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
     ########
     # Determine atmospheric stability
     # compute the bulk Richardson number (-)
+    if (param_dict['capping'] == 'minimum_wind' or gradfunc == 'webb_noahmp') and windspd < 1.:
+        windspd = 1.
     RiBulk = bulkRichardson(airTemp,  # air temperature (K)
                             sfcTemp,  # surface temperature (K)
                             windspd,  # wind speed (m s-1)
