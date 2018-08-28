@@ -137,6 +137,8 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                             'beljaar_holtslag': beljaar_holtslag,
                             'webb': webb,
                             'webb_noahmp': webb_noahmp,
+                            'webb_clmv45': webb_clmv45,
+                            'cheng_brutsaert': cheng_brutsaert,
                             }
 
         # Determine which gradient function the user wants to use. The default
@@ -206,17 +208,17 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                 L = mc.machineEpsilon
             zeta = mHeight / L
 
-            # Enact applicable capping
-            if cap == 'obukhov_length_capping' or gradfunc == 'webb_noahmp':
-                if L > 1:
-                    L = 1
-            elif cap == 'zeta_capping':
-                if zeta > 2:
-                    zeta = 2
+            # Enact zeta capping
+            if (gradfunc == 'webb_clmv45'
+                    or gradfunc == 'webb_noahmp'
+                    or cap == 'zeta_capping') and zeta > 1:
+                zeta = 1
 
             if L >= 0.:
                 # Stable
-                psiM, DpsitDzetaT = gradient_function(zeta, stabParams)
+                (psiH, psiM,
+                 DpsitDzetaT, DpsiMDzetaT) = gradient_function(zetaT,
+                                                               stabParams)
             else:
                 # Unstable
                 psiM = Unstable(L, mHeight, z0Groundh, 1)
@@ -235,7 +237,6 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                 andreas(ustar, z0Ground, airTemp, mHeight)
             if L >= 0.:
                 # Stable
-                psiH = psiM
                 psiQ = psiH
             else:
                 # Unstable
@@ -352,8 +353,6 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                                        / ((dlogW - psiM) * (dlogT - psiH)))
                 conductanceLatent = (mc.vkc**2.
                                      / ((dlogW - psiM) * (dlogQ - psiQ)))
-                # Alert the user
-                # print('Convergence problem in turbpy.aStability.moninObukhov')
                 # Collect MOST related parameters for use outside function
                 moninObukhovParameters = {'L': L,
                                           'psiM': psiM,
@@ -374,7 +373,6 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
             if L >= 0.:
                 # Next is derivative of Psi (returned from the
                 # gradient functions)
-                DpsiMDzetaT = DpsitDzetaT
                 dumM = 1. / (dlogW - psiM)
                 dumT = 1. / (dlogT - psiH)
                 # Derivative of y (ignoring humidity effects)
@@ -414,6 +412,8 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                     - 2. * np.arctan(x) + 1.5707963)
         else:
             stab = 2. * np.log((1. + x**2.) / 2.)
+
+        # Returning the derivative is not necessary during unstable conditions.
         return stab
 
 # ------------------------------------------------------------------------------
@@ -436,7 +436,83 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                        * (6. - 0.35 * zeta)
                        )
 
-        return stab, dstab_dzeta
+        # Return psi_h, psi_m, dpsi_h/dzeta, and dpsi_m/dzeta for handling
+        # cases when those terms are not equal. Note, that in HD88 these
+        # terms are assumed to be equal to each other.
+        return stab, stab, dstab_dzeta, dstab_dzeta
+
+# ------------------------------------------------------------------------------
+    def beljaar_holtslag(zeta, stabParams):
+        # From Beljaar and Holtslag, 1991, Journal of Applied Meteorology.
+
+        # Constants (not tunable?)
+        a = 1.0
+        b = 0.667
+        c = 5
+        d = 0.35
+
+        # Stability correction for heat (Psi_h when expressed in MO)
+        stab_h = (- (1. + (2. / 3.) * a * zeta) ** (3. / 2.)
+                  - b * (zeta - (c / d)) * np.exp(-d * zeta)
+                  - (b * c) / d + 1
+                  )
+
+        dstab_h_dzeta = (b * np.exp(-d * zeta) * (d * zeta - 1 - c)
+                         - a * (2. / 3. * a * zeta + 1)**(1./2.)
+                         )
+
+        # Stability correction for momentum (Psi_m when expressed in MO)
+        # This is identical to Psi from HD88, but with different constants
+        # (defined above).
+        stab_m = -(a * zeta
+                   + b * (zeta - c / d) * np.exp(-d * zeta)
+                   + b * c / d)
+
+        # Derivative with respect to zeta for iterative solutions.
+        dstab_m_dzeta = (b * np.exp(-d * zeta) * (d * zeta - 1 - c) - a)
+
+        # For the BH91 method, stab_h and stab_m are different.
+        return stab_h, stab_m, dstab_h_dzeta, dstab_m_dzeta
+
+    def cheng_brutsaert(zeta, stabParams):
+        '''
+        Cheng and Brutsaert (2005) as described by Jimenez et al. (2012)
+
+        Note, this method will not use the altered form of the conductances, as
+        this would require substantial refactoring of the code and we do not
+        anticipate as large of corrections, since z0/L is two orders of
+        magnitude smaller than the values used in the study.
+        This is equations 21 and 22 in Jimenez.
+
+        Additionally, many of the good limiting behavior introduced through
+        these conductance terms is only applicable to momentum and unstable
+        conditions. Neither is a focus of this package.
+        '''
+        a = 6.1
+        b = 2.5
+        c = 5.3
+        d = 1.1
+
+        # Stability corrections for heat
+        stab_h = -c * np.log(zeta + (1 + zeta**d) ** (1. / d))
+
+        # Derivatives for iteration (heat)
+        dstab_h_dzeta = ((-c * (zeta**(d - 1.)
+                                * (zeta**d + 1.)**(1. / d - 1.) + 1.))
+                         / ((zeta**d + 1)**(1. / d) + zeta))
+
+        # Stability corrections for momentum
+        stab_m = -a * np.log(zeta + (1 + zeta**b) ** (1. / d))
+
+        # Derivatives for iteration (momentum)
+        dstab_m_dzeta = ((-c * (zeta**(d - 1.)
+                                * (zeta**d + 1.)**(1. / d - 1.) + 1.))
+                         / ((zeta**d + 1)**(1. / d) + zeta))
+
+        # Return psi_h, psi_m, dpsi_h/dzeta, and dpsi_m/dzeta for handling
+        # cases when those terms are not equal. Note, that in CB05 these
+        # terms are assumed to be equal to each other.
+        return stab_h, stab_m, dstab_h_dzeta, dstab_m_dzeta
 
 # ------------------------------------------------------------------------------
     def webb(zeta, stabParams):
@@ -448,10 +524,13 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         # Derivative with respect to zeta for iterative solutions.
         dstab_dzeta = -alpha
 
-        return stab, dstab_dzeta
+        # Return psi_h, psi_m, dpsi_h/dzeta, and dpsi_m/dzeta for handling
+        # cases when those terms are not equal. Note, that in Webb these
+        # terms are assumed to be equal to each other.
+        return stab, stab, dstab_dzeta, dstab_dzeta
 
 # ------------------------------------------------------------------------------
-    def webb_noahmp(zeta, stabParams):
+    def webb_clmv45(zeta, stabParams):
         '''
         Gradient function as implemented in NoahMP
         '''
@@ -468,40 +547,33 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
             stab = (1 - alpha) * np.log(zeta) + zeta
             dstab_dzeta = (1 - alpha + zeta) / zeta
 
-        return stab, dstab_dzeta
+        # Return psi_h, psi_m, dpsi_h/dzeta, and dpsi_m/dzeta for handling
+        # cases when those terms are not equal. Note, that in Webb these
+        # terms are assumed to be equal to each other.
+        return stab, stab, dstab_dzeta, dstab_dzeta
 
 # ------------------------------------------------------------------------------
-    def beljaar_holtslag(zeta, stabParams):
-        # From Beljaar and Holtslag, 1991, Journal of Applied Meteorology.
-
-        # Constants (not tunable?)
-        a = 1.0
-        b = 0.667
-        c = 5
-        d = 0.35
+    def webb_noahmp(zeta, stabParams):
+        '''
+        Gradient function as implemented in NoahMP
+        '''
+        alpha = stabParams['stability_params']['webb']
 
         # Stability correction (Psi when expressed in MO)
-        stab = (- (1. + (2. / 3.) * a * zeta) ** (3. / 2.)
-                - b * (zeta - (c / d)) * np.exp(-d * zeta)
-                - (b * c) / d + 1
-                )
-
+        stab = -alpha * zeta
         # Derivative with respect to zeta for iterative solutions.
-        # dstab_dzeta = (a - ((2. / 3.) * a * zeta + 1)**(1. / 2.)
-        #                + b * d * np.exp(-d * zeta) * (zeta - (c / d))
-        #                - b * np.exp(-d * zeta)
-        #                )
-        dstab_dzeta = (b * np.exp(-d * zeta) * (d * zeta - 1 - c)
-                       - a * (2. / 3. * a * zeta + 1)**(1./2.)
-                       )
-        return stab, dstab_dzeta
+        dstab_dzeta = -alpha
 
+        # Return psi_h, psi_m, dpsi_h/dzeta, and dpsi_m/dzeta for handling
+        # cases when those terms are not equal. Note, that in Webb these
+        # terms are assumed to be equal to each other.
+        return stab, stab, dstab_dzeta, dstab_dzeta
 
 # ------------------------------------------------------------------------------
     def andreas(ustar, z0Ground, airTemp, mHeight):
         #    Compute scaler roughness lengths using procedure
         #    in Andreas, 1987, Boundary-Layer Meteorology 38, 159-184.  Only
-        #    use this procedure for snow.
+        #    use this procedure for snow (or bare soil)
         #
         #     Expression for kinematic viscosity of air is taken from program
         #     of Launiainen and Vihma, 1990, Environmental Software, vol. 5,
@@ -567,8 +639,15 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
     ########
     # Determine atmospheric stability
     # compute the bulk Richardson number (-)
-    if (param_dict['capping'] == 'minimum_wind' or gradfunc == 'webb_noahmp') and windspd < 1.:
+
+    # Enact a minimum wind speed option.
+    if param_dict['capping'] == 'minimum_wind' and windspd < 1.:
         windspd = 1.
+
+    if param_dict['stability_method'] == 'monin_obukhov' and windspd < 1.:
+        if param_dict['monin_obukhov']['gradient_function'] == 'webb_clmv45':
+            windspd = 1.
+
     RiBulk = bulkRichardson(airTemp,  # air temperature (K)
                             sfcTemp,  # surface temperature (K)
                             windspd,  # wind speed (m s-1)

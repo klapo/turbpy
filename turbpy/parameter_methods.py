@@ -107,5 +107,6 @@ def get_params(param_dict):
     # Assign last values for returning.
     out_param_dict['stability_method'] = stab_method
     out_param_dict['stability_params'][stab_method] = stab_param
+    out_param_dict['capping'] = capping
 
     return(out_param_dict)

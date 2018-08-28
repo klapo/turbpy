@@ -56,15 +56,15 @@ monin_obukhov:
         - 'webb'
         - 'beljaar_holtslag'
         - 'webb_noahmp'
+        - 'webb_clmv45'
+        - 'cheng_brutsaert'
         # Available options for monin-obukhov
     available_capping:
         # Apply the windless exchange as implemented in SNTHERM
         - windless_exchange
-        # The NoahMP approach (caps L at a value of 1)
-        - obukhov_length_capping
-        # The CLMv4.5 approach (caps zeta at a value of 2)
+        # The NoahMP and CLMv4.5 approach (caps L at a value of 1)
         - zeta_capping
         # No capping (implement as in theory)
         - no_capping
-        # Minimum wind speed
+        # Minimum wind speed (1 m/s, from CLMv4.5)
         - minimum_wind
