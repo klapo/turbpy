@@ -4,12 +4,11 @@ Package designed to allow simulation of surface turbulent fluxes outside a land-
 
 ![Example of the stability functions available in the turbpy package.](https://github.com/klapo/turbpy/blob/master/TF.OfflineTurb.Idealized.jpg)
 
-a) The stability corrections for the bulk aerodynamic methods
+a) Conductance for bulk aerodynamic methods
 
-b) the conductance for all methods
+b) $Q_h$ for aerodynamic methods
 
-c) the resulting sensible heat fluxes for each method assuming a surface temperature of 265K, wind speed of 1 m/s,
-surface roughness of 0.005, and varying the air temperature from 253K (Ri = -1) to 293K (Ri = 2).
+c-d) Same as in a and b, but for the Monin-Obukhov based schemes.
 
 See the jupyter notebook [TF.turbpyDemonstration](./TF.turbpyDemonstration.ipynb) for an example of how the turbpy package can be used. The image above is generated in this notebook.
 
