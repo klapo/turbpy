@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 from turbpy.bulkRichardson import bulkRichardson
 import turbpy.multiConst as mc
@@ -18,6 +19,10 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
     windspd                 wind speed (m s-1)
     z0Ground                surface roughness length (non-vegetated/snow) (m)
     '''
+
+    # A terrible approach for suppressing "divide" by zero warnings.
+    warnings.filterwarnings("ignore")
+
 
 # ------------------------------------------------------------------------------
 # Sub-functions (stability schemes)
@@ -154,9 +159,9 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         z0Groundh = z0Ground
         z0Groundq = z0Ground
         # log gradient for temperature, moisture, and wind
-        dlogT = np.log(mHeight / z0Groundh)
-        dlogQ = np.log(mHeight / z0Groundq)
-        dlogW = np.log(mHeight / z0Groundw)
+        dlogT = np.max(np.log(mHeight / z0Groundh), mc.machineEpsilon)
+        dlogQ = np.max(np.log(mHeight / z0Groundq), mc.machineEpsilon)
+        dlogW = np.max(np.log(mHeight / z0Groundw), mc.machineEpsilon)
 
         # Iteration control
         numMaxIterations = 50       # Number of iterations for convergence
