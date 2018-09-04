@@ -146,10 +146,22 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                             'cheng_brutsaert': cheng_brutsaert,
                             }
 
+        # Dictionary of available roughness length parameterizations
+        roughness_methods = {'andreas': andreas,
+                             'constant_z0': constant_z0}
+
         # Determine which gradient function the user wants to use. The default
         # Holtslag and de Bruin (1988).
         gradfunc = stabParams['monin_obukhov']['gradient_function']
         gradient_function = gradient_methods.get(gradfunc)
+
+        # Determine which roughness length function the user wants to use. The
+        # default is the constant value provided by the user.
+        roughfunc = stabParams['monin_obukhov']['roughness_function']
+        roughness_function = roughness_methods.get(roughfunc)
+
+        # Method for approximating the conductance
+        conductance_approx = stabParams['monin_obukhov']['conductance_approx']
 
         # Determine if we need to enact any capping
         cap = stabParams['capping']
@@ -158,10 +170,20 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         z0Groundw = z0Ground
         z0Groundh = z0Ground
         z0Groundq = z0Ground
-        # log gradient for temperature, moisture, and wind
-        dlogT = np.max(np.log(mHeight / z0Groundh), mc.machineEpsilon)
-        dlogQ = np.max(np.log(mHeight / z0Groundq), mc.machineEpsilon)
-        dlogW = np.max(np.log(mHeight / z0Groundw), mc.machineEpsilon)
+
+        # log gradient for temperature, moisture, and wind. Determine if we
+        # are approximating these terms or using the full expression.
+        if conductance_approx == 'approximate':
+            dlogT = np.max((np.log(mHeight / z0Groundh), mc.machineEpsilon))
+            dlogQ = np.max((np.log(mHeight / z0Groundq), mc.machineEpsilon))
+            dlogW = np.max((np.log(mHeight / z0Groundw), mc.machineEpsilon))
+        elif conductance_approx == 'full':
+            dlogT = np.max((np.log((mHeight + z0Groundh) / z0Groundh),
+                            mc.machineEpsilon))
+            dlogQ = np.max((np.log((mHeight + z0Groundq) / z0Groundq),
+                            mc.machineEpsilon))
+            dlogW = np.max((np.log((mHeight + z0Groundw) / z0Groundw),
+                            mc.machineEpsilon))
 
         # Iteration control
         numMaxIterations = 50       # Number of iterations for convergence
@@ -171,14 +193,15 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         zetaHigh = 500.
 
         # Initial Values: assume neutral stability for first guess
-        psiM = 0.					# Stability function for momentum
-        psiH = 0.					# Stability function for heat
-        psiQ = 0.					# Stability function for water vapor
+        psiM = mc.machineEpsilon  # Stability function for momentum
+        psiH = mc.machineEpsilon  # Stability function for heat
+        psiQ = mc.machineEpsilon  # Stability function for water vapor
         deltaT = airTemp - sfcTemp
         deltaE = (airVaporPress - sfcVaporPress) / 100.  # Convert Pa -> hPa
         Tbar = (airTemp + sfcTemp) / 2.
         zetaT = RiBulk * dlogW      # Stability parameter
         L = mHeight / zetaT 		# Obukhov height
+        zeta_roughness = (z0Groundh) / L
 
         ########
         # Iterative solution to CH,CD, and L
@@ -196,11 +219,12 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                                               'psiM': psiM,
                                               'psiH': psiH,
                                               'psiQ': psiQ,
-                                              'zeta': mHeight / L,
+                                              'zeta': np.nan,
                                               'zetaT': zetaT,
-                                              'freelim': 0.,
-                                              'freelimv': 0.,
+                                              'freelim': np.nan,
+                                              'freelimv': np.nan,
                                               'stabilityCorrection': np.nan,
+                                              'z0': z0Groundh,
                                               }
                     return (moninObukhovParameters,
                             conductanceSensible,
@@ -219,16 +243,53 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                     or cap == 'zeta_capping') and zeta > 1:
                 zeta = 1
 
+            # Stable
             if L >= 0.:
-                # Stable
-                (psiH, psiM,
-                 DpsitDzetaT, DpsiMDzetaT) = gradient_function(zetaT,
-                                                               stabParams)
+                # Conductance can either be approximated by neglecting the
+                # contribution of z0, or it can be included (the "full"
+                # calculation).
+                if conductance_approx == 'approximate':
+                    # Only get zeta for z/L
+                    (psiH, psiM,
+                     DpsitDzetaT, DpsiMDzetaT) = gradient_function(zetaT,
+                                                                   stabParams)
+                # Calculate conductance with the full expression, including
+                # the effect of z0 on the stability.
+                elif conductance_approx == 'full':
+                    # Psi as a function of (z + z0)/L
+                    (psiH, psiM,
+                     DpsitDzetaT, DpsiMDzetaT) = gradient_function(zetaT,
+                                                                   stabParams)
+                    # Psi as a function of z0/L
+                    (psiH_z0,
+                     psiM_z0, _, _) = gradient_function(zeta_roughness,
+                                                        stabParams)
             else:
                 # Unstable
                 psiM = Unstable(L, mHeight, z0Groundh, 1)
+                # The full conductance calculation is not implemented for
+                # unstable conditions.
+                psiM_z0 = 0
+                psiH_z0 = 0
+
+            ########
+            # First estimate for characteristic length scales
             sqrtCd = mc.vkc / max((dlogW - psiM), 0.1)
             ustar = sqrtCd * windspd
+            # Scalar lengths for temperature and moisture
+            if conductance_approx == 'approximate':
+                tstar = mc.vkc * deltaT / (dlogT - psiH)
+                qstar = (mc.vkc * deltaE * 100
+                         / (mc.R_wv * airTemp * mc.iden_air)
+                         / (dlogQ - psiQ))
+            elif conductance_approx == 'full':
+                # Full expression for the thermal length scale
+                tstar = mc.vkc * deltaT / (dlogT - psiH + psiH_z0)
+                # Full expression for moisture not implemented, just use the
+                # same expression as above.
+                qstar = (mc.vkc * deltaE * 100
+                         / (mc.R_wv * airTemp * mc.iden_air)
+                         / (dlogQ - psiQ))
 
             #########
             # b. Estimate scalar roughness lengths (zh, zq,and zm) and
@@ -238,8 +299,10 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
             # water vapor are made at the same height as wind. If this
             # assumption is broken, psiQ and psiH need be calculated
             # using the "Dutch" function.
+
+            # Determine the roughness length using the specified method.
             [z0Groundh, z0Groundq, dlogQ, dlogT] = \
-                andreas(ustar, z0Ground, airTemp, mHeight)
+                roughness_function(ustar, z0Ground, airTemp, mHeight)
             if L >= 0.:
                 # Stable
                 psiQ = psiH
@@ -248,11 +311,19 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                 psiH = Unstable(L, mHeight, z0Groundh, 2)
                 psiQ = psiH
             # Scalar lengths for temperature and moisture
-            tstar = mc.vkc * deltaT / (dlogT - psiH)
-            qstar = (mc.vkc * deltaE * 100
-                     / (mc.R_wv * airTemp * mc.iden_air)
-                     / (dlogQ - psiQ))
-
+            if conductance_approx == 'approximate':
+                tstar = mc.vkc * deltaT / (dlogT - psiH)
+                qstar = (mc.vkc * deltaE * 100
+                         / (mc.R_wv * airTemp * mc.iden_air)
+                         / (dlogQ - psiQ))
+            elif conductance_approx == 'full':
+                # Full expression for the thermal length scale
+                tstar = mc.vkc * deltaT / (dlogT - psiH + psiH_z0)
+                # Full expression for moisture not implemented, just use the
+                # same expression as above.
+                qstar = (mc.vkc * deltaE * 100
+                         / (mc.R_wv * airTemp * mc.iden_air)
+                         / (dlogQ - psiQ))
             #########
             # c. Compute Monin-Obukhov length (L)
             if (not tstar == 0.) and (not ustar == 0.):
@@ -290,6 +361,7 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                                           'freelim': freelim,
                                           'freelimv': freelimv,
                                           'stabilityCorrection': np.nan,
+                                          'z0': z0Groundh,
                                           }
                 return (moninObukhovParameters,
                         conductanceSensible,
@@ -333,11 +405,22 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                 zetaHigh = zetaT
 
             if (np.abs(y) < itTolerance) and (it >= 2):
-                # Within tolerance, leave loop
-                conductanceSensible = (mc.vkc**2.
-                                       / ((dlogW - psiM) * (dlogT - psiH)))
-                conductanceLatent = (mc.vkc**2.
-                                     / ((dlogW - psiM) * (dlogQ - psiQ)))
+                # Within tolerance, calculate conductance and leave loop
+                if conductance_approx == 'approximate':
+                    conductanceSensible = (mc.vkc**2.
+                                           / ((dlogW - psiM) * (dlogT - psiH)))
+                    conductanceLatent = (mc.vkc**2.
+                                         / ((dlogW - psiM) * (dlogQ - psiQ)))
+                elif conductance_approx == 'full':
+                    conductanceSensible = (mc.vkc**2.
+                                           / ((dlogW - psiM + psiM_z0)
+                                              * (dlogT - psiH + psiH_z0))
+                                           )
+                    # The full conductance approximation is not
+                    # implemented for latent heat.
+                    conductanceLatent = (mc.vkc**2.
+                                         / ((dlogW - psiM) * (dlogQ - psiQ)))
+
                 # Collect MOST related parameters for use outside function
                 moninObukhovParameters = {'L': L,
                                           'psiM': psiM,
@@ -348,10 +431,13 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                                           'freelim': freelim,
                                           'freelimv': freelimv,
                                           'stabilityCorrection': np.nan,
+                                          'z0': z0Groundh,
                                           }
                 return (moninObukhovParameters,
                         conductanceSensible,
                         conductanceLatent)
+
+            # Maximum number of iteratins reached.
             if it >= numMaxIterations - 1:
                 # NOT within tolerance, leave loop
                 conductanceSensible = (mc.vkc**2.
@@ -368,6 +454,7 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                                           'freelim': freelim,
                                           'freelimv': freelimv,
                                           'stabilityCorrection': np.nan,
+                                          'z0': z0Groundh,
                                           }
                 return (moninObukhovParameters,
                         conductanceSensible,
@@ -392,7 +479,11 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                     # Root out of range. Bisection instead of Newton-Raphson
                     zetaT = (zetaHigh + zetaLow) / 2.
                 else:
-                    zetaT = mHeight / L
+                    if conductance_approx == 'approximate':
+                        zetaT = mHeight / L
+                    elif conductance_approx == 'full':
+                        zetaT = (mHeight + z0Groundh) / L
+                        zeta_roughness = (z0Groundh) / L
                 # Update Obukhov length
                 L = mHeight / zetaT
 
@@ -482,16 +573,6 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
     def cheng_brutsaert(zeta, stabParams):
         '''
         Cheng and Brutsaert (2005) as described by Jimenez et al. (2012)
-
-        Note, this method will not use the altered form of the conductances, as
-        this would require substantial refactoring of the code and we do not
-        anticipate as large of corrections, since z0/L is two orders of
-        magnitude smaller than the values used in the study.
-        This is equations 21 and 22 in Jimenez.
-
-        Additionally, many of the good limiting behavior introduced through
-        these conductance terms is only applicable to momentum and unstable
-        conditions. Neither is a focus of this package.
         '''
         a = 6.1
         b = 2.5
@@ -507,12 +588,12 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                          / ((zeta**d + 1)**(1. / d) + zeta))
 
         # Stability corrections for momentum
-        stab_m = -a * np.log(zeta + (1 + zeta**b) ** (1. / d))
+        stab_m = -a * np.log(zeta + (1 + zeta**b) ** (1. / b))
 
         # Derivatives for iteration (momentum)
-        dstab_m_dzeta = ((-c * (zeta**(d - 1.)
-                                * (zeta**d + 1.)**(1. / d - 1.) + 1.))
-                         / ((zeta**d + 1)**(1. / d) + zeta))
+        dstab_m_dzeta = ((-c * (zeta**(b - 1.)
+                                * (zeta**b + 1.)**(1. / b - 1.) + 1.))
+                         / ((zeta**b + 1)**(1. / b) + zeta))
 
         # Return psi_h, psi_m, dpsi_h/dzeta, and dpsi_m/dzeta for handling
         # cases when those terms are not equal. Note, that in CB05 these
@@ -591,7 +672,7 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
             b0 = 1.250
             b1 = 0.
             b2 = 0.
-        elif Reynolds < 2.5:
+        elif (Reynolds < 2.5) and (Reynolds > 0.135):
             # Transition coefficients
             b0 = 0.149
             b1 = -0.550
@@ -631,6 +712,20 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         dlogQ = np.log(mHeight / z0Groundq)
 
         return (z0Groundh, z0Groundq, dlogQ, dlogT)
+
+# ------------------------------------------------------------------------------
+    def constant_z0(ustar, z0Ground, airTemp, mHeight):
+        '''
+        Just returns a constant z0 value.
+        '''
+        z0Groundh = z0Ground
+        z0Groundq = z0Ground
+
+        dlogT = np.log(mHeight / z0Groundh)
+        dlogQ = np.log(mHeight / z0Groundq)
+
+        return (z0Groundh, z0Groundq, dlogQ, dlogT)
+
 # ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------

@@ -100,9 +100,37 @@ def get_params(param_dict):
                              + '\nValid stability options: '
                              + ', '.join(defaults['monin_obukhov']['available_capping']))
 
+        # Determine the roughness length parameterizations
+        try:
+            roughness_function = param_dict['monin_obukhov']['roughness_function']
+        except KeyError:
+            roughness_function = defaults['monin_obukhov']['roughness_function']
+
+        # Determine if the roughness function is correct
+        if roughness_function not in defaults['monin_obukhov']['available_roughness_funcs']:
+            raise ValueError('Unrecognized roughness length option for Monin-Obukhov: '
+                             + roughness_function
+                             + '\nValid roughness length options: '
+                             + ', '.join(defaults['monin_obukhov']['available_roughness_funcs']))
+
+        # Determine how the conductance is calculated
+        try:
+            conductance_approx = param_dict['monin_obukhov']['conductance_approx']
+        except KeyError:
+            conductance_approx = defaults['monin_obukhov']['conductance_approx']
+
+        # Determine if the roughness function is correct
+        if conductance_approx not in defaults['monin_obukhov']['available_cond_funcs']:
+            raise ValueError('Unrecognized conductance option for Monin-Obukhov: '
+                             + conductance_approx
+                             + '\nValid conductance options: '
+                             + ', '.join(defaults['monin_obukhov']['available_cond_funcs']))
+
         # Assign MO values to the parameter dictionary to return to turbpy
         out_param_dict['monin_obukhov']['gradient_function'] = gradient_function
         out_param_dict['monin_obukhov']['capping'] = capping
+        out_param_dict['monin_obukhov']['roughness_function'] = roughness_function
+        out_param_dict['monin_obukhov']['conductance_approx'] = conductance_approx
 
     # Assign last values for returning.
     out_param_dict['stability_method'] = stab_method

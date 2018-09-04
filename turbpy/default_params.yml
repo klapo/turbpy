@@ -51,6 +51,10 @@ monin_obukhov:
     # Select how the stability correciton is parameterized for the
     # Monin-Obukhov approach. The options are displayed below.
     gradient_function: 'holtslag_debruin'
+    roughness_function: 'constant_z0'
+    conductance_approx: 'approximate'
+
+    # Methods available within turbpy
     available_gradient_funcs:
         - 'holtslag_debruin'
         - 'webb'
@@ -58,13 +62,22 @@ monin_obukhov:
         - 'webb_noahmp'
         - 'webb_clmv45'
         - 'cheng_brutsaert'
-        # Available options for monin-obukhov
     available_capping:
         # Apply the windless exchange as implemented in SNTHERM
-        - windless_exchange
+        - 'windless_exchange'
         # The NoahMP and CLMv4.5 approach (caps L at a value of 1)
-        - zeta_capping
+        - 'zeta_capping'
         # No capping (implement as in theory)
-        - no_capping
+        - 'no_capping'
         # Minimum wind speed (1 m/s, from CLMv4.5)
-        - minimum_wind
+        - 'minimum_wind'
+    available_roughness_funcs:
+        # Use a constant z0 value
+        - 'constant_z0'
+        # Use the Andreas 1987 parameterization (only for very smooth surfaces)
+        - 'andreas'
+    available_cond_funcs:
+        # Use the full expressions for conductance (include the Psi(z0/L))
+        - 'full'
+        # Approximate conductance without the z0 modification
+        - 'approximate'
