@@ -68,7 +68,8 @@ def turbFluxes(airTemp,  # air temperature at some height above the surface (K)
     if groundSnowFraction > 0. and sfcTemp < mc.Tfreeze:
         latHeatSubVapGround = mc.LH_sub  # sublimation from snow
     # case when the ground is snow-free
-    # evaporation of water in the soil pores, this occurs even if frozen because of super-cooled water
+    # evaporation of water in the soil pores, this occurs even if frozen
+    # because of super-cooled water
     elif groundSnowFraction == 0.:
         latHeatSubVapGround = mc.LH_vap
     else:
