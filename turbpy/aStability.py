@@ -134,6 +134,8 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
 # Monin-Obukhov stability as implemented in SNTHERM
 # ------------------------------------------------------------------------------
     def moninObukhov(stabParams=param_dict, z0Ground=z0Ground):
+        # Assumes that measurement height for temperature and
+        # water vapor are made at the same height as wind.
 
         # Grab paramter values (none used in MO method as implmented currently)
 
@@ -148,7 +150,8 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
 
         # Dictionary of available roughness length parameterizations
         roughness_methods = {'andreas': andreas,
-                             'constant_z0': constant_z0}
+                             'constant_z0': constant_z0,
+                             'yang_08': yang_08}
 
         # Determine which gradient function the user wants to use. The default
         # Holtslag and de Bruin (1988).
@@ -231,8 +234,8 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                             conductanceLatent)
 
             #########
-            # a. Compute momentum stability functions, transfer coefficient Cd,
-            # and friction veolocity ustar
+            # a. Compute stability functions, transfer coefficient Cd,
+            # and length scales
             if L == 0:
                 L = mc.machineEpsilon
             zeta = mHeight / L
@@ -264,8 +267,13 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                     (psiH_z0,
                      psiM_z0, _, _) = gradient_function(zeta_roughness,
                                                         stabParams)
+
+                # Assume moisture and temperature observations are at
+                # the same height.
+                psiQ = psiH
+
+            # Unstable
             else:
-                # Unstable
                 psiM = Unstable(L, mHeight, z0Groundh, 1)
                 # The full conductance calculation is not implemented for
                 # unstable conditions.
@@ -273,7 +281,7 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                 psiH_z0 = 0
 
             ########
-            # First estimate for characteristic length scales
+            # Estimate for characteristic length scales
             sqrtCd = mc.vkc / max((dlogW - psiM), 0.1)
             ustar = sqrtCd * windspd
             # Scalar lengths for temperature and moisture
@@ -292,38 +300,33 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
                          / (dlogQ - psiQ))
 
             #########
-            # b. Estimate scalar roughness lengths (zh, zq,and zm) and
-            # stability functions (heat and moisture)
-            #
-            # Assumes that measurement height for temperature and
-            # water vapor are made at the same height as wind. If this
-            # assumption is broken, psiQ and psiH need be calculated
-            # using the "Dutch" function.
+            # b. Estimate scalar roughness lengths (zh, zq,and zm).
 
             # Determine the roughness length using the specified method.
             [z0Groundh, z0Groundq, dlogQ, dlogT] = \
-                roughness_function(ustar, z0Ground, airTemp, mHeight)
-            if L >= 0.:
-                # Stable
-                psiQ = psiH
-            else:
+                roughness_function(ustar, tstar, z0Ground, airTemp, mHeight)
+
+            # Recalculate the unstable correction using new z0 values.
+            if L < 0.:
                 # Unstable
                 psiH = Unstable(L, mHeight, z0Groundh, 2)
                 psiQ = psiH
-            # Scalar lengths for temperature and moisture
-            if conductance_approx == 'approximate':
-                tstar = mc.vkc * deltaT / (dlogT - psiH)
-                qstar = (mc.vkc * deltaE * 100
-                         / (mc.R_wv * airTemp * mc.iden_air)
-                         / (dlogQ - psiQ))
-            elif conductance_approx == 'full':
-                # Full expression for the thermal length scale
-                tstar = mc.vkc * deltaT / (dlogT - psiH + psiH_z0)
-                # Full expression for moisture not implemented, just use the
-                # same expression as above.
-                qstar = (mc.vkc * deltaE * 100
-                         / (mc.R_wv * airTemp * mc.iden_air)
-                         / (dlogQ - psiQ))
+
+                # Scalar lengths for temperature and moisture
+                if conductance_approx == 'approximate':
+                    tstar = mc.vkc * deltaT / (dlogT - psiH)
+                    qstar = (mc.vkc * deltaE * 100
+                             / (mc.R_wv * airTemp * mc.iden_air)
+                             / (dlogQ - psiQ))
+                elif conductance_approx == 'full':
+                    # Full expression for the thermal length scale
+                    tstar = mc.vkc * deltaT / (dlogT - psiH + psiH_z0)
+                    # Full expression for moisture not implemented, just use
+                    # the same expression as above.
+                    qstar = (mc.vkc * deltaE * 100
+                             / (mc.R_wv * airTemp * mc.iden_air)
+                             / (dlogQ - psiQ))
+
             #########
             # c. Compute Monin-Obukhov length (L)
             if (not tstar == 0.) and (not ustar == 0.):
@@ -656,7 +659,9 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         return stab, stab, dstab_dzeta, dstab_dzeta
 
 # ------------------------------------------------------------------------------
-    def andreas(ustar, z0Ground, airTemp, mHeight):
+# Sub-functions to Monin-Obukhov -- Surface roughness length
+# ------------------------------------------------------------------------------
+    def andreas(ustar, tstar, z0Ground, airTemp, mHeight):
         #    Compute scaler roughness lengths using procedure
         #    in Andreas, 1987, Boundary-Layer Meteorology 38, 159-184.  Only
         #    use this procedure for snow (or bare soil)
@@ -712,9 +717,35 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
         dlogQ = np.log(mHeight / z0Groundq)
 
         return (z0Groundh, z0Groundq, dlogQ, dlogT)
+# ------------------------------------------------------------------------------
 
 # ------------------------------------------------------------------------------
-    def constant_z0(ustar, z0Ground, airTemp, mHeight):
+    def yang_08(ustar, tstar, z0Ground, airTemp, mHeight):
+        '''
+        As implemented in NoahMPv1.1
+        '''
+        # Constants
+        beta = 7.2  # m^(-1/2) s^(1/2) K^(-1/4)
+        m = 0.5
+        n = 0.25
+        # Kinematic viscosity (as estimated in Andreas 1987)
+        kinvisc = (1. * 10.**7. / (.9065 * airTemp - 112.7)) ** (-1.)
+
+        z0Ground = 70 * kinvisc / ustar * np.exp(-beta * ustar**(m)
+                                                 * np.abs(tstar)**(n))
+        z0Groundh = z0Ground
+        z0Groundq = z0Ground
+
+        # Log profiles
+        dlogT = np.log(mHeight / z0Groundh)
+        dlogQ = np.log(mHeight / z0Groundq)
+
+        return (z0Groundh, z0Groundq, dlogQ, dlogT)
+
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+    def constant_z0(ustar, tstar, z0Ground, airTemp, mHeight):
         '''
         Just returns a constant z0 value.
         '''
@@ -728,6 +759,8 @@ def aStability(param_dict, mHeight, airTemp, airVaporPress,
 
 # ------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------
+# Start the actual aStability function
 # ------------------------------------------------------------------------------
     # Dictionary to stability function calls
     stabilityCase = {'standard': standard,

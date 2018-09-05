@@ -51,7 +51,7 @@ monin_obukhov:
     # Select how the stability correciton is parameterized for the
     # Monin-Obukhov approach. The options are displayed below.
     gradient_function: 'holtslag_debruin'
-    roughness_function: 'constant_z0'
+    roughness_function: 'yang_08'
     conductance_approx: 'approximate'
 
     # Methods available within turbpy
@@ -76,6 +76,8 @@ monin_obukhov:
         - 'constant_z0'
         # Use the Andreas 1987 parameterization (only for very smooth surfaces)
         - 'andreas'
+        # Yang 08 (as used in WRF-Noah)
+        - yang_08
     available_cond_funcs:
         # Use the full expressions for conductance (include the Psi(z0/L))
         - 'full'
