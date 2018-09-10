@@ -109,7 +109,7 @@ def turbFluxes(airTemp,  # air temperature at some height above the surface (K)
         (senHeatGround, latHeatGround,
          conductanceSensible, conductanceLatent) = \
             surfFluxCalc.moninObukhov(airTemp, airVaporPress,
-                                      sfcTemp, sfcVaporPress,
+                                      sfcTemp, sfcVaporPress, windspd,
                                       stabilityCorrectionParameters,
                                       senHeatGround, latHeatGround,
                                       conductanceSensible, conductanceLatent,
