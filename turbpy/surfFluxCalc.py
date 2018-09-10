@@ -1,6 +1,6 @@
 
 
-def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
+def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress, windspd,
                  stabilityCorrectionParameters, senHeatGround0, latHeatGround0,
                  conductanceSensible, conductanceLatent,
                  volHeatCapacityAir, latHeatSubVapGround,
@@ -70,8 +70,8 @@ def moninObukhov(airTemp, airVaporPress, sfcTemp, sfcVaporPress,
 
     ########
     # Convert to fluxes
-    senHeatGround = senHeatGround * deltaT
-    latHeatGround = latHeatGround * deltaE
+    senHeatGround = senHeatGround * deltaT * windspd
+    latHeatGround = latHeatGround * deltaE * windspd
 
     ########
     # Return turbulent fluxes and newly calculated conductances
