@@ -1,16 +1,8 @@
 # turbpy
 ## Offline land-surface turbulence schemes
-Package designed to allow simulation of surface turbulent fluxes outside of a land-model context.
+Package designed to allow simulation of surface turbulent fluxes outside of a land-model context. See the jupyter notebook [TF.turbpyDemonstration](./TF.turbpyDemonstration.ipynb) for an example of how the turbpy package can be used. The example plots are generated in this notebook.
 
 ![Example of the stability functions available in the turbpy package.](https://github.com/klapo/turbpy/blob/master/turbpy.idealized.jpg)
-
-a) Conductance for bulk aerodynamic methods
-
-b) $Q_h$ for aerodynamic methods
-
-c-d) Same as in a and b, but for the Monin-Obukhov based schemes.
-
-See the jupyter notebook [TF.turbpyDemonstration](./TF.turbpyDemonstration.ipynb) for an example of how the turbpy package can be used. The image above is generated in this notebook.
 
 ## Available conductance schemes
 
