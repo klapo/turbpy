@@ -25,10 +25,6 @@ Attempts to represent the role of spatial variability in the bulk Richardson num
 
 ## Monin-Obukhov methods
 
-This publication describes both options 1 and 2.  
-Beljaars, A. C. M., & Holtslag, A. A. M. (1991). Flux Parameterization over Land Surfaces for Atmospheric Models. Journal of Applied Meteorology. https://doi.org/10.1175/1520-0450(1991)030
-
-
 **1) Holtslag and de Bruin**
 
 **2)	Beljaars and Holtslag**
