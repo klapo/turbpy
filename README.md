@@ -33,7 +33,7 @@ Beljaars, A. C. M., & Holtslag, A. A. M. (1991). Flux Parameterization over Land
 
 **2)	Beljaars and Holtslag**
 
-**3) Cheng and Brutsaert 2005 **
+**3) Cheng and Brutsaert 2005**
 
 **4) Log-linear/Webb/Paulson** 
 
