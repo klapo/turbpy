@@ -1,4 +1,9 @@
 # turbpy
+
+Lapo, K. E. (2017). turbpy python package for simulating turbulence. Seattle, WA: University of Washington. doi:10.5281/zenodo.1066940
+
+Lapo, K., Nijssen, B., & Lundquist, J. D. (2019). Evaluation of Turbulence Stability Schemes of Land Models for Stable Conditions. Journal of Geophysical Research: Atmospheres, 124, 3072-3089. doi:10.1029/2018JD028970
+
 ## Offline land-surface turbulence schemes
 Package designed to allow simulation of surface turbulent fluxes outside of a land-model context. See the jupyter notebook [TF.turbpyDemonstration](./TF.turbpyDemonstration.ipynb) for an example of how the turbpy package can be used. The example plots are generated in this notebook.
 
